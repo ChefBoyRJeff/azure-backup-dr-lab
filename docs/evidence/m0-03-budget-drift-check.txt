@@ -1,0 +1,31 @@
+=== drift check after fixing dates (expect only @secure() contactEmails noise) ===
+Note: The result may contain false positive predictions (noise).
+You can help us improve the accuracy of the result by opening an issue here: https://aka.ms/WhatIfIssues
+NOTICE! - Want to get What-if without noise? Move to Deployment Stacks What-If https://aka.ms/stackswhatifGA
+
+Resource and property changes are indicated with these symbols:
+  - Delete
+  + Create
+  ~ Modify
+
+The deployment will update the following scope:
+
+Scope: /subscriptions/<subscription>
+
+  ~ Microsoft.Consumption/budgets/budget-backup-dr-lab [2023-11-01]
+    ~ properties.notifications.actual_100.contactEmails: [
+      - 0: "<email>"
+      + 0: "[parameters('alertEmail')]"
+      ]
+    ~ properties.notifications.actual_50.contactEmails: [
+      - 0: "<email>"
+      + 0: "[parameters('alertEmail')]"
+      ]
+    ~ properties.notifications.forecasted_100.contactEmails: [
+      - 0: "<email>"
+      + 0: "[parameters('alertEmail')]"
+      ]
+    ~ properties.timePeriod.endDate:   "2036-10-01T00:00:00Z" => "2036-10-01"
+    ~ properties.timePeriod.startDate: "2026-10-01T00:00:00Z" => "2026-10-01"
+
+Resource changes: 1 to modify.

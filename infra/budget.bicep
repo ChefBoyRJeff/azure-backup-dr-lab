@@ -14,8 +14,14 @@ param budgetName string = 'budget-backup-dr-lab'
 @minValue(1)
 param amount int = 5
 
-@description('First day of the budget period (must be the first of a month). Defaults to the current month.')
-param startDate string = '${utcNow('yyyy-MM')}-01'
+// Fixed dates, not utcNow(): what-if can't evaluate utcNow(), and next month the expression would try to move an
+// existing budget's start date. endDate is the default Azure assigned (10 years); declaring it keeps the code equal
+// to the stored state, so what-if reports NoChange (M0 drift check).
+@description('First day of the budget period (must be the first of a month)')
+param startDate string = '2026-10-01'
+
+@description('Budget end date (Azure\'s default when none is given: start + 10 years)')
+param endDate string = '2036-10-01'
 
 @description('Resource groups whose cost counts toward this budget')
 param resourceGroupNames array = [
@@ -36,6 +42,7 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
     timeGrain: 'Monthly'
     timePeriod: {
       startDate: startDate
+      endDate: endDate
     }
     filter: {
       dimensions: {
