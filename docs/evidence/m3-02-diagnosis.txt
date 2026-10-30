@@ -1,0 +1,88 @@
+=== M3 diagnosis: restored disk contained post-incident data (verification FAIL) ===
+--- recovery points ---
+Time                          RpName
+----------------------------  --------------------------------
+2026-10-30T16:24:02.0935831Z  2a9ca789d2f7418fb75397f22f365aef
+--- jobs ---
+Operation       Status     Start                         End
+--------------  ---------  ----------------------------  ----------------------------
+Initial Backup  Completed  2026-10-30T16:21:28.7729287Z  2026-10-30T16:25:06.2182368Z
+Restore         Completed  2026-10-30T16:34:03.9695517Z  2026-10-30T16:37:40.675665Z
+--- snapshots in rg-backup-snapshots ---
+Name                                                                          Created
+----------------------------------------------------------------------------  ---------------------------------
+AzureBackup_<guid>_2026-10-30T16-22-06.5623913  2026-10-30T16:23:12.9469127+00:00
+--- restored disk: what was it created from? ---
+createOption: Copy
+created: '2026-10-30T16:34:47.3322484+00:00'
+source: /subscriptions/<subscription>/resourceGroups/rg-backup-snapshots/providers/Microsoft.Compute/snapshots/AzureBackup_<guid>_2026-10-30T16-22-06.5623913
+sourceUri: null
+--- VM model vs. instance view (what is actually attached) ---
+model OS disk:    vm-spoke-lab2-osdisk-restored
+instance disks:   vm-spoke-lab2-osdisk-restored
+--- disk states (managedBy = which VM holds it) ---
+lastOwnershipUpdate: null
+managedBy: null
+name: vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+state: Unattached
+lastOwnershipUpdate: null
+managedBy: /subscriptions/<subscription>/resourceGroups/rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+name: vm-spoke-lab2-osdisk-restored
+state: Reserved
+--- activity log 16:15-16:45Z, rg-hubspoke-vms and rg-backup-restore (succeeded operations) ---
+2026-10-30T16:41:02.6850346Z	Microsoft.Compute/virtualMachines/deallocate/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:40:29.2589331Z	Microsoft.Compute/virtualMachines/runCommand/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:39:54.2845789Z	Microsoft.Compute/virtualMachines/start/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:38:34.2241781Z	Microsoft.Compute/virtualMachines/write	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:38:31.8589939Z	Microsoft.Authorization/policies/audit/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:34:28.9830215Z	Microsoft.Insights/ActivityLogAlerts/Activated/action	rg-monitoring-lab/providers/microsoft.insights/activityLogAlerts/alert-vm-started
+2026-10-30T16:34:28.9819272Z	Microsoft.Insights/ActivityLogAlerts/Activated/action	rg-monitoring-lab/providers/microsoft.insights/activityLogAlerts/alert-vm-deallocated
+2026-10-30T16:30:24.4832021Z	Microsoft.Compute/virtualMachines/deallocate/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:29:50.751934Z	Microsoft.Compute/virtualMachines/runCommand/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:29:19.1719368Z	Microsoft.Compute/virtualMachines/start/action	rg-hubspoke-vms/providers/Microsoft.Compute/virtualMachines/vm-spoke-lab2
+2026-10-30T16:34:49.7952311Z	Microsoft.Compute/disks/write	rg-backup-restore/providers/Microsoft.Compute/disks/vm-spoke-lab2-osdisk-restored
+2026-10-30T16:48:14Z vm start exit=0
+--- forensic read of the disk the VM booted from ---
+Enable succeeded: 
+[stdout]
+--- boots recorded on this disk (UTC) ---
+ -7 1e83fd06ffc04993b75a64f98e8c1bc1 Sun 2026-10-25 14:30:23 UTC Sun 2026-10-25 14:33:28 UTC
+ -6 adaf5bdae6b240878882f97df3b6cec1 Sun 2026-10-25 15:03:21 UTC Sun 2026-10-25 15:06:21 UTC
+ -5 e6a5a8a5af3b443986a6a167735d2eef Sun 2026-10-25 15:13:45 UTC Sun 2026-10-25 15:17:05 UTC
+ -4 f6a637b87680461d8a578183a1a98524 Sun 2026-10-25 18:41:07 UTC Sun 2026-10-25 18:42:03 UTC
+ -3 b791b44d18754664a085e6b85b1bcba7 Sun 2026-10-25 22:26:11 UTC Sun 2026-10-25 22:51:24 UTC
+ -2 b9ac0d2e7db2484e8eadb325c053dacc Fri 2026-10-30 15:58:13 UTC Fri 2026-10-30 16:01:05 UTC
+ -1 f4664c22fdd64fb0979fa2613c628a1d Fri 2026-10-30 16:39:28 UTC Fri 2026-10-30 16:40:55 UTC
+  0 48a1fbe0664941a8acb32e872eb7caed Fri 2026-10-30 16:47:29 UTC Fri 2026-10-30 16:48:23 UTC
+--- lab files (full timestamps) ---
+total 5120
+-rw-r--r-- 1 root root 5242880 2026-10-30 16:39:48.783161933 +0000 payload.bin
+--- run-command scripts this disk has received ---
+== /var/lib/waagent/run-command/download/0/  2026-10-22 20:28:02.171953375 +0000
+== /var/lib/waagent/run-command/download/1/  2026-10-22 20:29:16.406843584 +0000
+== /var/lib/waagent/run-command/download/10/  2026-10-25 22:49:37.746356972 +0000
+== /var/lib/waagent/run-command/download/11/  2026-10-30 15:59:49.846389244 +0000
+dd if=/dev/urandom of=payload.bin bs=1M count=5 status=none
+cat marker.txt
+== /var/lib/waagent/run-command/download/12/  2026-10-30 16:39:48.731161376 +0000
+rm -f marker.txt
+dd if=/dev/zero of=payload.bin bs=1M count=5 status=none
+== /var/lib/waagent/run-command/download/13/  2026-10-30 16:40:20.423707833 +0000
+echo '--- after restore ---'
+cat marker.txt
+== /var/lib/waagent/run-command/download/14/  2026-10-30 16:48:23.254608241 +0000
+for d in /var/lib/waagent/run-command/download/*/; do echo "== $d  $(stat -c %y "$d")"; grep -m2 -E 'rm -f|dd if|cat marker|forensic|after restore' "$d/script.sh" 2>/dev/null; done
+== /var/lib/waagent/run-command/download/2/  2026-10-22 20:30:24.718657397 +0000
+== /var/lib/waagent/run-command/download/3/  2026-10-22 20:31:45.090617801 +0000
+== /var/lib/waagent/run-command/download/4/  2026-10-22 20:32:29.333144058 +0000
+== /var/lib/waagent/run-command/download/5/  2026-10-22 20:33:37.661960942 +0000
+== /var/lib/waagent/run-command/download/6/  2026-10-25 14:32:08.533389004 +0000
+== /var/lib/waagent/run-command/download/7/  2026-10-25 15:05:03.221537992 +0000
+== /var/lib/waagent/run-command/download/8/  2026-10-25 15:15:20.325400107 +0000
+== /var/lib/waagent/run-command/download/9/  2026-10-25 22:27:03.180605119 +0000
+--- clock ---
+Fri Oct 30 16:48:23 UTC 2026
+
+[stderr]
+
+2026-10-30T16:50:10Z vm deallocate exit=0

@@ -1,0 +1,33 @@
+=== M3: incident (lab data destroyed) -> restore recovery point to new disk -> OS disk swap -> verify (approved 2026-10-30) ===
+Baseline (m2-01): marker.txt 751ddbb24ce22322e1b56cd84b5232e80eaee92ed4b82bfde4169af7a90dc0e4 / payload.bin a03a15680da1f500cb30d28da96af6b7ea8452d132d8f1dd68e10a89e7684348
+2026-10-30T16:28:25Z  original OS disk (kept for rollback): vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+2026-10-30T16:29:38Z  vm start exit=0
+2026-10-30T16:29:38Z  INCIDENT: deleting marker.txt and overwriting payload.bin with zeros
+Enable succeeded: 
+[stdout]
+--- after incident ---
+total 5120
+-rw-r--r-- 1 root root 5242880 Oct 30 16:29 payload.bin
+marker.txt MISSING
+c036cbb7553a909f8b8877d4461924307f27ecb66cff928eeeafd569c3887e29  payload.bin
+
+[stderr]
+
+2026-10-30T16:30:11Z  T0 DETECTED: marker missing and payload hash differs from baseline (RTO clock starts)
+2026-10-30T16:30:44Z  contain: vm deallocated exit=0
+2026-10-30T16:38:30Z  restore job complete; restored disk found: True
+2026-10-30T16:39:03Z  OS disk swapped to restored disk exit=0
+2026-10-30T16:39:04Z  VM now boots from: vm-spoke-lab2-osdisk-restored
+2026-10-30T16:40:17Z  vm start exit=0
+Enable succeeded: 
+[stdout]
+--- after restore ---
+c036cbb7553a909f8b8877d4461924307f27ecb66cff928eeeafd569c3887e29  payload.bin
+
+[stderr]
+cat: marker.txt: No such file or directory
+sha256sum: marker.txt: No such file or directory
+
+2026-10-30T16:40:49Z  VERIFIED: both hashes match baseline = False (RTO clock stops)
+2026-10-30T16:40:50Z  RTO measured: 10:38 (mm:ss) from T0; target <= 30:00 -> FAIL
+2026-10-30T16:41:22Z  vm deallocated exit=0
