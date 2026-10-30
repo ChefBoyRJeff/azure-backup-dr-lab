@@ -1,0 +1,8 @@
+=== M1c: role assignments held by the Backup vault's managed identity (approved 2026-10-30) ===
+Expected: exactly 3, at resource or resource-group scope; none at subscription scope.
+Storage Account Backup Contributor is deferred to M4 (storage account not yet created).
+Role                       Scope
+-------------------------  ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Disk Backup Reader         /subscriptions/<subscription>/resourceGroups/RG-HUBSPOKE-VMS/providers/Microsoft.Compute/disks/vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+Disk Snapshot Contributor  /subscriptions/<subscription>/resourceGroups/rg-backup-snapshots
+Disk Restore Operator      /subscriptions/<subscription>/resourceGroups/rg-backup-restore
