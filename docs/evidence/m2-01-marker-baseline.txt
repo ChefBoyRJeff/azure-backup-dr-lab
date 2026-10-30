@@ -1,0 +1,17 @@
+=== M2: baseline data written to vm-spoke-lab2 OS disk before backup ===
+power state before: VM deallocated
+vm start exit=0
+Enable succeeded: 
+[stdout]
+--- marker.txt ---
+backup-dr-lab marker
+written_utc=2026-10-30T15:59:49Z
+nonce=33f15665186e23b922ac027ecd937d5c
+--- sha256 ---
+751ddbb24ce22322e1b56cd84b5232e80eaee92ed4b82bfde4169af7a90dc0e4  marker.txt
+a03a15680da1f500cb30d28da96af6b7ea8452d132d8f1dd68e10a89e7684348  payload.bin
+
+[stderr]
+
+vm deallocate exit=0
+power state after: VM deallocated

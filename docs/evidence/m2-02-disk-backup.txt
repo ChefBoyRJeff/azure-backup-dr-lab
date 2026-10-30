@@ -1,0 +1,25 @@
+=== M2: disk backup instance, on-demand backup job, recovery point, snapshot ===
+--- backup instance ---
+- datasource: vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+  name: vm-spoke-lab2_OsDisk_1_21494d66c3b54adfa-vm-spoke-lab2_OsDisk_1_21494d66c3b54adfa-<guid>
+  policy: /subscriptions/<subscription>/resourceGroups/rg-backup-lab/providers/Microsoft.DataProtection/backupVaults/bv-backup-lab/backupPolicies/pol-disk-daily
+  protection: ProtectionConfigured
+  snapshotRg: /subscriptions/<subscription>/resourceGroups/rg-backup-snapshots
+--- jobs ---
+Operation       Status     Start                         End                           Duration
+--------------  ---------  ----------------------------  ----------------------------  ----------------
+Initial Backup  Completed  2026-10-30T16:21:28.7729287Z  2026-10-30T16:25:06.2182368Z  00:03:37.4453081
+--- recovery points ---
+Time
+----------------------------
+2026-10-30T16:24:02.0935831Z
+--- snapshots in rg-backup-snapshots ---
+Name                                                                          Created                            Incremental    SizeGB
+----------------------------------------------------------------------------  ---------------------------------  -------------  --------
+AzureBackup_<guid>_2026-10-30T16-22-06.5623913  2026-10-30T16:23:12.9469127+00:00  True           30
+
+--- notes ---
+On-demand 'Backup now' triggered the first backup of the disk, listed as 'Initial Backup': 16:21:28Z-16:25:06Z (3m37s).
+Job start to recovery point: ~2.5 min (recovery point 16:24:02Z).
+Recovery point 16:24:02Z is after the baseline marker (15:59:49Z, m2-01), so the marker data is included.
+Snapshot SizeGB is the provisioned size; incremental snapshots bill on used data.
