@@ -1,0 +1,53 @@
+=== M3 retry (approved 2026-10-30): remove Run Command extension -> new restore -> swap -> verify ===
+Root cause of attempt 1: RunCommandLinux extension replayed the incident script on the restored disk's first boot (m3-02).
+2026-10-30T20:20:36Z  T0' retry starts (RTO clock for attempt 2)
+--- extensions before ---
+
+2026-10-30T20:20:41Z  no RunCommandLinux extension found
+--- extensions after ---
+
+Finding: no extensions listed in the VM model; Run Command v1 (RunCommandLinux) is platform-managed and not removable via 'az vm extension delete'.
+Mitigation used instead: the latest Run Command issued (16:48Z forensic read, m3-02) is read-only, so a replay on first boot is harmless.
+2026-10-30T20:22:03Z  T0' reset: retry recovery work starts now (previous T0' 20:20:36Z waited on runbook revision)
+2026-10-30T20:28:35Z  restore 2 complete; disk found: True
+2026-10-30T20:29:09Z  OS disk swapped exit=0 -> vm-spoke-lab2-osdisk-restored2
+2026-10-30T20:30:22Z  vm start exit=0
+2026-10-30T20:30:22Z  waiting 90s for the VM agent to settle
+--- instance view extensions (running VM) ---
+
+Enable succeeded: 
+[stdout]
+run-token=157f0c4fd9bc41389fccff49fd5c0813
+--- boots on this disk ---
+ -2 b791b44d18754664a085e6b85b1bcba7 Sun 2026-10-25 22:26:11 UTC Sun 2026-10-25 22:51:24 UTC
+ -1 b9ac0d2e7db2484e8eadb325c053dacc Fri 2026-10-30 15:58:13 UTC Fri 2026-10-30 16:01:05 UTC
+  0 0bc34f43446e4b74b1b28251ee8d58b3 Fri 2026-10-30 20:29:32 UTC Fri 2026-10-30 20:32:01 UTC
+--- run-command folders (newest) ---
+total 56
+drwx------ 2 root root 4096 2026-10-30 20:32:01.532062722 +0000 15
+drwx------ 2 root root 4096 2026-10-30 20:29:53.437958194 +0000 14
+drwx------ 2 root root 4096 2026-10-30 15:59:49.846389244 +0000 11
+--- lab files ---
+total 5124
+-rw-r--r-- 1 root root      93 2026-10-30 15:59:49.859396634 +0000 marker.txt
+-rw-r--r-- 1 root root 5242880 2026-10-30 15:59:49.891414827 +0000 payload.bin
+--- marker ---
+backup-dr-lab marker
+written_utc=2026-10-30T15:59:49Z
+nonce=33f15665186e23b922ac027ecd937d5c
+--- sha256 ---
+751ddbb24ce22322e1b56cd84b5232e80eaee92ed4b82bfde4169af7a90dc0e4  marker.txt
+a03a15680da1f500cb30d28da96af6b7ea8452d132d8f1dd68e10a89e7684348  payload.bin
+
+[stderr]
+
+2026-10-30T20:32:27Z  fresh run (token echoed) = True; both hashes match baseline = True
+2026-10-30T20:32:27Z  RTO attempt 2: 10:23 from T0'; target <= 30:00 -> PASS
+2026-10-30T20:33:13Z  vm deallocated exit=0
+2026-10-30T20:34:25Z  rollback: original disk found: True
+2026-10-30T20:34:59Z  rollback swap exit=0 -> vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+--- disk states after rollback ---
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f: Reserved
+vm-spoke-lab2-osdisk-restored: Unattached
+vm-spoke-lab2-osdisk-restored2: Unattached
+power state: VM deallocated
