@@ -1,0 +1,21 @@
+# Compiled ARM output (generated from Bicep; never committed)
+*.json
+!bicepconfig.json
+
+# Local parameter files: hold real values such as the budget alert email. Never commit.
+*.local.bicepparam
+
+# Raw portal exports (reference only)
+infra/export/
+
+# Test data generated locally (hashes are committed as evidence, data files are not)
+testdata/
+
+# Unsanitized screenshots
+docs/screenshots/raw/
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.venv/
