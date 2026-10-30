@@ -1,0 +1,26 @@
+=== M1b: backup policies ===
+Finding: the portal would not allow unchecking Vaulted backup for a blob policy, and the CLI default template
+(dataprotection 1.14.0, --datasource-type AzureBlob) is also vaulted (VaultStore P7D + BackupDaily schedule).
+pol-blob-operational was therefore created with the CLI from an explicit operational-only definition.
+pol-disk-daily was created in the portal.
+- datasource: Microsoft.Storage/storageAccounts/blobServices
+  name: pol-blob-operational
+  rules:
+  - kind: AzureRetentionRule
+    retention: P7D
+    rule: Default
+    schedule: null
+    store: OperationalStore
+- datasource: Microsoft.Compute/disks
+  name: pol-disk-daily
+  rules:
+  - kind: AzureRetentionRule
+    retention: P7D
+    rule: Default
+    schedule: null
+    store: OperationalStore
+  - kind: AzureBackupRule
+    retention: null
+    rule: BackupDaily
+    schedule: R/2026-10-30T06:00:00-05:00/P1D
+    store: null

@@ -1,0 +1,11 @@
+=== M1a: Backup vault created in portal; verify settings ===
+crossSubscriptionRestore: Disabled
+identityPrincipalId: <guid>
+identityType: SystemAssigned
+immutability: Disabled
+location: eastus
+name: bv-backup-lab
+provisioning: Succeeded
+redundancy: LocallyRedundant
+softDelete: 'ON'
+softDeleteDays: 14.0
