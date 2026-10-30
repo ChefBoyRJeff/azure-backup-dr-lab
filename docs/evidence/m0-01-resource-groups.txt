@@ -1,0 +1,4 @@
+M0 setup, 2026-10-30 10:49:57 local; dataprotection extension 1.14.0
+created/exists: rg-backup-lab  (exists=true)
+created/exists: rg-backup-snapshots  (exists=true)
+created/exists: rg-backup-restore  (exists=true)

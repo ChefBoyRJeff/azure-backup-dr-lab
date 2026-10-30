@@ -1,0 +1,93 @@
+=== what-if ===
+Note: The result may contain false positive predictions (noise).
+You can help us improve the accuracy of the result by opening an issue here: https://aka.ms/WhatIfIssues
+NOTICE! - Want to get What-if without noise? Move to Deployment Stacks What-If https://aka.ms/stackswhatifGA
+
+Resource and property changes are indicated with this symbol:
+  + Create
+
+The deployment will update the following scope:
+
+Scope: /subscriptions/<subscription>
+
+  + Microsoft.Consumption/budgets/budget-backup-dr-lab [2023-11-01]
+
+      apiVersion:                                            "2023-11-01"
+      id:                                                    "/subscriptions/<subscription>/providers/Microsoft.Consumption/budgets/budget-backup-dr-lab"
+      name:                                                  "budget-backup-dr-lab"
+      properties.amount:                                     5
+      properties.category:                                   "Cost"
+      properties.filter.dimensions.name:                     "ResourceGroupName"
+      properties.filter.dimensions.operator:                 "In"
+      properties.filter.dimensions.values: [
+        0: "rg-backup-lab"
+        1: "rg-backup-snapshots"
+        2: "rg-backup-restore"
+      ]
+      properties.notifications.Actual_100.contactEmails: [
+        0: "[parameters('alertEmail')]"
+      ]
+      properties.notifications.Actual_100.enabled:           true
+      properties.notifications.Actual_100.operator:          "GreaterThanOrEqualTo"
+      properties.notifications.Actual_100.threshold:         100
+      properties.notifications.Actual_100.thresholdType:     "Actual"
+      properties.notifications.Actual_50.contactEmails: [
+        0: "[parameters('alertEmail')]"
+      ]
+      properties.notifications.Actual_50.enabled:            true
+      properties.notifications.Actual_50.operator:           "GreaterThanOrEqualTo"
+      properties.notifications.Actual_50.threshold:          50
+      properties.notifications.Actual_50.thresholdType:      "Actual"
+      properties.notifications.Forecasted_100.contactEmails: [
+        0: "[parameters('alertEmail')]"
+      ]
+      properties.notifications.Forecasted_100.enabled:       true
+      properties.notifications.Forecasted_100.operator:      "GreaterThanOrEqualTo"
+      properties.notifications.Forecasted_100.threshold:     100
+      properties.notifications.Forecasted_100.thresholdType: "Forecasted"
+      properties.timeGrain:                                  "Monthly"
+      properties.timePeriod.startDate:                       "[format('{0}-01', utcNow('yyyy-MM'))]"
+      type:                                                  "Microsoft.Consumption/budgets"
+
+Resource changes: 1 to create.
+=== deploy ===
+Succeeded
+=== verify: budget as stored by Azure (emails redacted) ===
+name:        budget-backup-dr-lab
+amount:      5  timeGrain: Monthly  start: 10/01/2026 00:00:00
+filter:      ResourceGroupName In [rg-backup-lab, rg-backup-snapshots, rg-backup-restore]
+currentSpend: 0 USD
+alert:       actual_100  Actual >= 100%  enabled=True  recipients=1
+alert:       actual_50  Actual >= 50%  enabled=True  recipients=1
+alert:       forecasted_100  Forecasted >= 100%  enabled=True  recipients=1
+=== drift check: what-if after deploy (expect NoChange) ===
+Note: The result may contain false positive predictions (noise).
+You can help us improve the accuracy of the result by opening an issue here: https://aka.ms/WhatIfIssues
+NOTICE! - Want to get What-if without noise? Move to Deployment Stacks What-If https://aka.ms/stackswhatifGA
+
+Resource and property changes are indicated with these symbols:
+  - Delete
+  + Create
+  ~ Modify
+
+The deployment will update the following scope:
+
+Scope: /subscriptions/<subscription>
+
+  ~ Microsoft.Consumption/budgets/budget-backup-dr-lab [2023-11-01]
+    - properties.timePeriod.endDate:   "2036-10-01T00:00:00Z"
+    ~ properties.notifications.actual_100.contactEmails: [
+      - 0: "<email>"
+      + 0: "[parameters('alertEmail')]"
+      ]
+    ~ properties.notifications.actual_50.contactEmails: [
+      - 0: "<email>"
+      + 0: "[parameters('alertEmail')]"
+      ]
+    ~ properties.notifications.forecasted_100.contactEmails: [
+      - 0: "<email>"
+      + 0: "[parameters('alertEmail')]"
+      ]
+    ~ properties.timePeriod.startDate: "2026-10-01T00:00:00Z" => "[format('{0}-01', utcNow('yyyy-MM'))]"
+
+Resource changes: 1 to modify.
