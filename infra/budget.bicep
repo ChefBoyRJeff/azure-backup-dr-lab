@@ -18,10 +18,10 @@ param amount int = 5
 // existing budget's start date. endDate is the default Azure assigned (10 years); declaring it keeps the code equal
 // to the stored state, so what-if reports NoChange (M0 drift check).
 @description('First day of the budget period (must be the first of a month)')
-param startDate string = '2026-10-01'
+param startDate string = '2026-10-01T00:00:00Z'
 
 @description('Budget end date (Azure\'s default when none is given: start + 10 years)')
-param endDate string = '2036-10-01'
+param endDate string = '2036-10-01T00:00:00Z'
 
 @description('Resource groups whose cost counts toward this budget')
 param resourceGroupNames array = [
