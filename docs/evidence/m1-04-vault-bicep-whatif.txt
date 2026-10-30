@@ -1,0 +1,17 @@
+=== M1d: what-if of infra/vault.bicep against the portal/CLI-built vault and policies (goal: no changes) ===
+Note: The result may contain false positive predictions (noise).
+You can help us improve the accuracy of the result by opening an issue here: https://aka.ms/WhatIfIssues
+NOTICE! - Want to get What-if without noise? Move to Deployment Stacks What-If https://aka.ms/stackswhatifGA
+
+Resource and property changes are indicated with this symbol:
+  = Nochange
+
+The deployment will update the following scope:
+
+Scope: /subscriptions/<subscription>/resourceGroups/rg-backup-lab
+
+  = Microsoft.DataProtection/backupVaults/bv-backup-lab [2025-07-01]
+  = Microsoft.DataProtection/backupVaults/bv-backup-lab/backupPolicies/pol-blob-operational [2025-07-01]
+  = Microsoft.DataProtection/backupVaults/bv-backup-lab/backupPolicies/pol-disk-daily [2025-07-01]
+
+Resource changes: 3 no change.
