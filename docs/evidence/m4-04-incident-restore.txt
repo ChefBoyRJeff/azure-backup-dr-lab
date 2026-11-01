@@ -1,0 +1,28 @@
+=== M4: blob incident (overwrite doc1.txt, delete doc2.txt) -> point-in-time restore to 21:09:15Z -> verify ===
+2026-11-01T21:11:30Z  INCIDENT: doc1.txt overwritten exit=0
+2026-11-01T21:11:31Z  INCIDENT: doc2.txt deleted exit=0
+--- blobs after incident ---
+Name         Size     Modified
+-----------  -------  -------------------------
+doc1.txt     21       2026-11-01T21:11:29+00:00
+payload.bin  1048576  2026-11-01T21:07:13+00:00
+2026-11-01T21:11:36Z  T0 DETECTED: doc1.txt changed (size 21), doc2.txt missing (RTO clock starts)
+--- restore job ---
+Op       Status     Start                         End                           Duration
+-------  ---------  ----------------------------  ----------------------------  ----------------
+Restore  Completed  2026-11-01T21:22:07.0414213Z  2026-11-01T21:37:29.8741985Z  00:15:22.8327772
+2026-11-01T21:38:00Z  download doc1.txt exit=0
+2026-11-01T21:38:02Z  download doc2.txt exit=0
+2026-11-01T21:38:03Z  download payload.bin exit=0
+--- restored SHA-256 vs baseline ---
+99c24460aacb57f7659843d249d64fe68d60fc7d86cef3abafb9e3937ecc2534  doc1.txt  match=True
+6e75d68fa3db7b3918a6c1c61daa39c469f27f9c56af6619cacfecde3170596f  doc2.txt  match=True
+d6d107d23679def8c2e4110b89f77182c1b238130cd45da1a017e77baa2b00cd  payload.bin  match=True
+2026-11-01T21:38:03Z  VERIFIED: all three hashes match baseline = True (RTO clock stops)
+2026-11-01T21:38:05Z  RTO blob: 26:27 from T0; target <= 15:00 -> FAIL
+
+--- notes ---
+RTO breakdown: T0 -> restore job start 10:31 (portal navigation); restore job 15:22; download + verify ~0:34; total 26:27 vs target 15:00 -> FAIL.
+Data recovery PASS: doc1.txt (overwritten) and doc2.txt (deleted) restored, payload.bin (untouched control) unchanged; all SHA-256 match baseline.
+Root cause of RTO miss: target set without checking documented PITR behavior. Microsoft Learn: 'after up to one hour for the restore job to be picked up ... a restore with a small number of changes would require up to one hour to restore.'
+Corrective: set PITR RTO from documented + measured behavior (~1 h); script restores via CLI; use soft-delete undelete or version promotion for fast single-object recovery.

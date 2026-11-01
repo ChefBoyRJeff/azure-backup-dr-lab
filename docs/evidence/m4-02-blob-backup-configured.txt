@@ -1,0 +1,21 @@
+=== M4: operational blob backup configured; effects on the storage account ===
+--- backup instances ---
+- datasource: stbkplab3026
+  policy: /subscriptions/<subscription>/resourceGroups/rg-backup-lab/providers/Microsoft.DataProtection/backupVaults/bv-backup-lab/backupPolicies/pol-blob-operational
+  protection: ConfiguringProtection
+  type: Microsoft.Storage/storageAccounts/blobServices
+- datasource: vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+  policy: /subscriptions/<subscription>/resourceGroups/rg-backup-lab/providers/Microsoft.DataProtection/backupVaults/bv-backup-lab/backupPolicies/pol-disk-daily
+  protection: ProtectionConfigured
+  type: Microsoft.Compute/disks
+--- blob service data protection (set by Azure Backup) ---
+blobSoftDeleteDays: 12
+changeFeed: true
+containerSoftDeleteDays: 7
+pitrDays: 7
+pitrEnabled: true
+versioning: true
+--- locks on the storage account ---
+Name                         Level         Notes
+---------------------------  ------------  -----------------------------------------------------------------------------
+AzureBackupLock-DoNotDelete  CanNotDelete  Azure Backup protection lock to prevent accident deletion of storage account.

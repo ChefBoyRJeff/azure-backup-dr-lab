@@ -1,0 +1,15 @@
+=== M4: storage account (portal) + role assignments at its scope (approved 2026-11-01) ===
+hns: null
+httpsOnly: true
+kind: StorageV2
+location: eastus
+minTls: TLS1_2
+name: stbkplab3026
+publicBlobAccess: false
+sku: Standard_LRS
+--- role assignments at exactly this account's scope ---
+Role                                PrincipalType
+----------------------------------  ----------------
+Storage Account Backup Contributor  ServicePrincipal
+Storage Blob Data Contributor       User
+entraDefaultInPortal: true

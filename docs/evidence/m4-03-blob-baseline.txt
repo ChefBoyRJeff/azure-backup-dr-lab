@@ -1,0 +1,18 @@
+=== M4: blob baseline (test data, uploads with --auth-mode login) ===
+2026-11-01T21:07:05Z  blob protection status: ProtectionConfigured
+2026-11-01T21:07:08Z  container create exit=0
+2026-11-01T21:07:10Z  upload doc1.txt exit=0
+2026-11-01T21:07:11Z  upload doc2.txt exit=0
+2026-11-01T21:07:13Z  upload payload.bin exit=0
+--- baseline SHA-256 ---
+99c24460aacb57f7659843d249d64fe68d60fc7d86cef3abafb9e3937ecc2534  doc1.txt
+6e75d68fa3db7b3918a6c1c61daa39c469f27f9c56af6619cacfecde3170596f  doc2.txt
+d6d107d23679def8c2e4110b89f77182c1b238130cd45da1a017e77baa2b00cd  payload.bin
+--- blobs in labdata ---
+Name         Size     Modified
+-----------  -------  -------------------------
+doc1.txt     82       2026-11-01T21:07:10+00:00
+doc2.txt     83       2026-11-01T21:07:11+00:00
+payload.bin  1048576  2026-11-01T21:07:13+00:00
+2026-11-01T21:10:05Z  KNOWN-GOOD TIME: 2026-11-01T21:09:15Z  (local: 2026-11-01 4:10:05 PM)
+NOTE: Tgood captured at 21:09:15Z; the 'local' value printed later (4:10:05 PM). Restore point used: 21:09:15Z = 4:09 PM EST.
