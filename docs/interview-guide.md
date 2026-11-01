@@ -80,6 +80,28 @@ Answer these out loud, without notes:
 6. How would you prove a restore worked for a database instead of files?
 7. Explain the difference between crash-consistent and application-consistent in one sentence each.
 
+### Model answers
+
+Check your own answers against these. Don't memorize them; an answer recited word for word sounds rehearsed.
+
+**1. 7 AM one day, 6 AM the next.** The policy stores its schedule as an ISO 8601 repeating interval with a **fixed −05:00 offset** (`R/2026-10-30T06:00:00-05:00/P1D`), so it runs at 11:00 UTC every day. On Oct 31 the US was on daylight time (UTC−4), so 11:00 UTC was 7 AM local. After the clocks changed on Nov 1, it was 6 AM. The backup never moved; the local clock did. If a business needs a fixed local time, confirm how the service handles daylight saving, or schedule in UTC and communicate that.
+
+**2. A 5-minute RTO for blob data.** Not with point-in-time restore: Microsoft documents it at up to an hour, and I measured a 15-minute job plus portal time. First ask which failure they mean. For a deleted or overwritten file, **soft-delete undelete or promoting a previous version** takes seconds and can be scripted, so 5 minutes is realistic. For losing the whole account or region, you need a second copy you can switch to (object replication to another account, or geo-redundant storage with read access), which costs more. Then test it and report the measured number.
+
+**3. Only the disk instance was soft-deleted.** Soft delete protects backup data that the vault manages. The disk instance had recovery points backed by snapshots, so deleting it put them into a 14-day soft-deleted state. Operational blob backup keeps **no data in the vault**: the history lives in the storage account as versions and soft-deleted blobs, so the vault had nothing to retain. I observed this in the teardown evidence ([m5-02](evidence/m5-02-teardown.txt)); the explanation is my reading of what I saw.
+
+**4. Why not click "Assign missing roles."** It grants roles on your behalf at scopes the portal chooses, which may be broader than what was reviewed and approved, and it leaves no deliberate record of the change. The message also often means a role you already assigned **hasn't propagated yet**. So check what's assigned at which scope, wait a few minutes, and revalidate. If something really is missing, assign that specific documented role at the narrowest scope, as a reviewed change.
+
+**5. Hierarchical namespace enabled.** Then it's a Data Lake Storage Gen2 account, which Azure Backup protects as a **different datasource type** with vaulted backup and its own protected-instance cost. The operational-only blob policy wouldn't apply, and point-in-time restore support is limited for those accounts. Hierarchical namespace can't be turned off after creation, so you'd need a new account. That's why it was checked on the Advanced tab before creating the account.
+
+**6. Proving a database restore.** Same principle: known data plus a check. Before the backup, insert marker rows with a unique value and record row counts or checksums of key tables. After the restore, confirm the database comes online cleanly, run an integrity check (`DBCC CHECKDB` for SQL Server), query the marker rows, compare the counts, and have the application connect and run a real transaction. Also make sure the backup was **application-consistent**, so you aren't restoring a database caught mid-write.
+
+**7. Crash-consistent versus application-consistent.**
+- **Crash-consistent:** the backup captures whatever was on disk at one instant, like pulling the power cord. Anything still in memory is lost, and the application may need to recover when it starts.
+- **Application-consistent:** the application is told to flush and pause writes first (VSS on Windows, pre and post scripts on Linux), so the backup holds a clean state that starts without recovery.
+
+**Likely next question: "Which one did your disk backup give you?"** Crash-consistent. Azure Disk Backup snapshots the disk without coordinating with the guest OS. I **deallocated the VM before the backup**, which shut it down cleanly, so in practice the snapshot held a consistent file system.
+
 ## 5. Honest Limits to Mention If Asked
 
 - It's a lab: one VM, one storage account, a few megabytes of data.
