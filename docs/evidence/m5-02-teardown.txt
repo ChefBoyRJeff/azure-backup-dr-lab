@@ -1,0 +1,59 @@
+=== M5 teardown (approved 2026-11-01): G1 protection ===
+2026-11-01T21:42:21Z  vault soft delete -> Off exit=1
+2026-11-01T21:42:22Z  soft delete now: ON
+2026-11-01T21:45:29Z  deleted backup instance for stbkplab3026 exit=0
+2026-11-01T21:46:33Z  deleted backup instance for vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f exit=0
+--- after G1 ---
+2026-11-01T21:46:33Z  backup instances remaining: D:\Development\azure-backup-dr-lab>  "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\\..\python.exe" -IBm azure.cli dataprotection backup-instance list -g rg-backup-lab --vault-name bv-backup-lab --query length(@) -o tsv
+2026-11-01T21:46:33Z  soft-deleted instances: -o was unexpected at this time. D:\Development\azure-backup-dr-lab>  "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\\..\python.exe" -IBm azure.cli dataprotection backup-instance deleted-backup-instance list -g rg-backup-lab --vault-name bv-backup-lab --query length(@) -o tsv
+2026-11-01T21:46:35Z  storage lock still present: False
+2026-11-01T21:47:50Z  snapshots remaining: D:\Development\azure-backup-dr-lab>  "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\\..\python.exe" -IBm azure.cli snapshot list -g rg-backup-snapshots --query length(@) -o tsv
+--- G1 verification (re-run; counts done in PowerShell to avoid cmd.exe parsing of length(@)) ---
+Finding: soft delete Off rejected (DppAlwaysOnSoftDeleteStateMandatory): this API version only accepts AlwaysOn. Soft delete left ON; vault deletion deferred until soft-deleted items expire (14 days).
+2026-11-01T21:49:22Z  backup instances remaining: 0
+--- soft-deleted instances ---
+Datasource                                               State        DeletedAt                     PurgeAt
+-------------------------------------------------------  -----------  ----------------------------  ----------------------------
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  SoftDeleted  2026-11-01T21:45:30.6895915Z  2026-11-15T21:45:30.6895915Z
+--- snapshots remaining ---
+Name                                                                          Created
+----------------------------------------------------------------------------  ---------------------------------
+AzureBackup_<guid>_2026-10-30T16-22-06.5623913  2026-10-30T16:23:12.9469127+00:00
+AzureBackup_<guid>_2026-10-31T11-01-10.0658703  2026-10-31T11:02:19.1423989+00:00
+AzureBackup_<guid>_2026-11-01T11-01-03.6682565  2026-11-01T11:02:14.0925653+00:00
+=== G2-G4: storage, disk artifacts, RBAC ===
+2026-11-01T21:50:18Z  removed vault MI Storage Account Backup Contributor exit=0
+2026-11-01T21:50:23Z  removed your Storage Blob Data Contributor exit=0
+2026-11-01T21:50:26Z  deleted storage account stbkplab3026 exit=0
+2026-11-01T21:50:59Z  deleted snapshot ...-30T16-22-06.5623913 exit=0
+2026-11-01T21:51:01Z  deleted snapshot ...-31T11-01-10.0658703 exit=-1073741819
+2026-11-01T21:51:33Z  deleted snapshot ...-01T11-01-03.6682565 exit=0
+2026-11-01T21:52:05Z  deleted disk vm-spoke-lab2-osdisk-restored exit=0
+2026-11-01T21:52:37Z  deleted disk vm-spoke-lab2-osdisk-restored2 exit=-1073741819
+2026-11-01T21:52:40Z  removed Disk Backup Reader (Lab 2 disk) exit=0
+2026-11-01T21:52:45Z  removed Disk Snapshot Contributor exit=0
+2026-11-01T21:52:50Z  removed Disk Restore Operator exit=0
+2026-11-01T21:54:10Z  deleted empty RG rg-backup-snapshots exit=0
+2026-11-01T21:54:28Z  deleted empty RG rg-backup-restore exit=0
+--- verification ---
+2026-11-01T21:54:30Z  vault MI role assignments remaining: 0
+2026-11-01T21:54:32Z  resources in rg-backup-lab: bv-backup-lab
+2026-11-01T21:54:35Z  rg-backup-snapshots exists: false; rg-backup-restore exists: false
+2026-11-01T21:54:42Z  Lab 2 OS disk still present: True
+NOTE: exit=-1073741819 (0xC0000005) on one snapshot delete and one disk delete = az client crash on Windows; deletions confirmed by the empty-RG guard (0 resources) before RG deletion.
+=== G6: remove lab files from vm-spoke-lab2 ===
+2026-11-01T21:56:40Z  vm start exit=-1073741819
+Enable succeeded: 
+[stdout]
+--- newest run-command folders (replay check) ---
+total 60
+drwx------ 2 root root 4096 2026-11-01 21:57:47.480696985 +0000 16
+drwx------ 2 root root 4096 2026-11-01 21:56:09.188386285 +0000 15
+drwx------ 2 root root 4096 2026-10-30 16:29:46.122497936 +0000 12
+/var/lib/backup-lab removed
+
+[stderr]
+
+2026-11-01T21:58:44Z  vm deallocate exit=0
+2026-11-01T21:58:46Z  power: VM deallocated
+--- deferred until 2026-11-15T21:45Z (soft-deleted disk instance purge): delete policies, vault bv-backup-lab, rg-backup-lab; budget after final cost check ---

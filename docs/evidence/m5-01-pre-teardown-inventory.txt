@@ -1,0 +1,58 @@
+=== M5: pre-teardown inventory 2026-11-01T21:40:15Z ===
+--- resources in rg-backup-lab ---
+Name
+-------------
+bv-backup-lab
+stbkplab3026
+--- resources in rg-backup-snapshots ---
+Name
+----------------------------------------------------------------------------
+AzureBackup_<guid>_2026-10-30T16-22-06.5623913
+AzureBackup_<guid>_2026-10-31T11-01-10.0658703
+AzureBackup_<guid>_2026-11-01T11-01-03.6682565
+--- resources in rg-backup-restore ---
+Name
+------------------------------
+vm-spoke-lab2-osdisk-restored
+vm-spoke-lab2-osdisk-restored2
+--- snapshots (with creation time) ---
+Name                                                                          Created
+----------------------------------------------------------------------------  ---------------------------------
+AzureBackup_<guid>_2026-10-30T16-22-06.5623913  2026-10-30T16:23:12.9469127+00:00
+AzureBackup_<guid>_2026-10-31T11-01-10.0658703  2026-10-31T11:02:19.1423989+00:00
+AzureBackup_<guid>_2026-11-01T11-01-03.6682565  2026-11-01T11:02:14.0925653+00:00
+--- backup instances ---
+Datasource                                               Protection
+-------------------------------------------------------  --------------------
+stbkplab3026                                             ProtectionConfigured
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  ProtectionConfigured
+--- all backup jobs ---
+Datasource                                               Op              Status     Start                         Duration
+-------------------------------------------------------  --------------  ---------  ----------------------------  ----------------
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  Initial Backup  Completed  2026-10-30T16:21:28.7729287Z  00:03:37.4453081
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  Restore         Completed  2026-10-30T16:34:03.9695517Z  00:03:36.7061133
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  Restore         Completed  2026-10-30T20:24:36.426985Z   00:03:39.0684302
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  Backup          Completed  2026-10-31T11:00:17.0280504Z  00:03:53.7282038
+vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f  Backup          Completed  2026-11-01T11:00:19.4254498Z  00:03:46.4609315
+stbkplab3026                                             Restore         Completed  2026-11-01T21:22:07.0414213Z  00:15:22.8327772
+--- locks in rg-backup-lab ---
+Name                         Level         Resource
+---------------------------  ------------  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+AzureBackupLock-DoNotDelete  CanNotDelete  /subscriptions/<subscription>/resourcegroups/rg-backup-lab/providers/Microsoft.Storage/storageAccounts/stbkplab3026/providers/Microsoft.Authorization/locks/AzureBackupLock-DoNotDelete
+--- vault soft delete ---
+retentionDurationInDays: 14.0
+state: 'ON'
+--- role assignments held by the vault identity ---
+Role                                Scope
+----------------------------------  ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Disk Backup Reader                  /subscriptions/<subscription>/resourceGroups/RG-HUBSPOKE-VMS/providers/Microsoft.Compute/disks/vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
+Disk Snapshot Contributor           /subscriptions/<subscription>/resourceGroups/rg-backup-snapshots
+Disk Restore Operator               /subscriptions/<subscription>/resourceGroups/rg-backup-restore
+Storage Account Backup Contributor  /subscriptions/<subscription>/resourcegroups/rg-backup-lab/providers/Microsoft.Storage/storageAccounts/stbkplab3026
+--- role assignments on the storage account ---
+Role                                PrincipalType
+----------------------------------  ----------------
+Storage Account Backup Contributor  ServicePrincipal
+Storage Blob Data Contributor       User
+--- Lab 2 VM (must survive teardown) ---
+power: VM deallocated; OS disk: vm-spoke-lab2_OsDisk_1_21494d66c3b54adfaa7db655958f229f
