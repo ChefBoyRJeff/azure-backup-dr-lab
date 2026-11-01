@@ -1,6 +1,6 @@
 # Project 5 Plan: Azure Backup and Recovery Lab
 
-**Status:** Plan v2 approved 2026-10-30 (Disk Backup + Blob backup; VM backup with a Recovery Services vault was evaluated and declined on cost). Nothing deployed yet.
+**Status:** Plan v2 approved 2026-10-30 (Disk Backup + Blob backup; VM backup with a Recovery Services vault was evaluated and declined on cost). **Executed 2026-10-30 to 2026-11-01; see [Outcomes and Deviations](#outcomes-and-deviations) at the end.**
 
 ## Business Problem
 
@@ -78,3 +78,20 @@ Azure CLI 2.90.0 with the **`dataprotection` extension 1.14.0** (approved 2026-1
 2. Delete restored disks and the storage account.
 3. Remove role assignments; delete the vault once soft-deleted items have expired.
 4. Delete the three backup resource groups and the budget.
+
+## Outcomes and Deviations
+
+Recorded after execution (2026-11-01). The plan above is kept as approved; this section records what actually happened.
+
+| Milestone | Outcome | Deviation from plan |
+|---|---|---|
+| M0 | Budget deployed by Bicep; drift check clean except `@secure()` noise | Built in Bicep, not the portal: the portal budget filter can't select empty resource groups |
+| M1 | Vault, policies, 3 disk roles; Bicep what-if 3 no change | The blob policy was created with the CLI from an explicit operational-only definition: the portal and the CLI default template both force the vaulted tier. The storage role was deferred to M4. Role assignments stayed CLI-managed. |
+| M2 | Backup job 3:37; recovery point 16:24:02Z | None |
+| M3 | Attempt 1 **FAIL** (Run Command replay, [RCA-001](rca/rca-001-run-command-replay.md)); attempt 2 **PASS**, RTO 10:23 | A second restore was needed; Lab 2 was rolled back to its original disk as planned |
+| M4 | Data **PASS**; RTO 26:27 vs 15:00 **FAIL** ([RCA-002](rca/rca-002-blob-rto-target.md)) | Target corrected to about 1 h based on documented PITR behavior |
+| M5 | Teardown complete except the vault and `rg-backup-lab` | Vault soft delete couldn't be turned off (`DppAlwaysOnSoftDeleteStateMandatory`); vault deletion deferred to the purge time **2026-11-15 21:45 UTC**. Snapshots survived instance deletion and were deleted explicitly. Azure Backup removed its own storage lock. |
+
+Monitoring of backup jobs (planned for M5) was not built; it's listed as an improvement in the README. Project 2 covers alerting.
+
+**Remaining actions after 2026-11-15 21:45 UTC:** delete policies `pol-disk-daily` and `pol-blob-operational`, vault `bv-backup-lab`, resource group `rg-backup-lab`; check the final cost; delete budget `budget-backup-dr-lab`.
