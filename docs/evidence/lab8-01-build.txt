@@ -1,0 +1,52 @@
+--- Lab 8 M1: build (2026-11-07 09:42:37) ---
+--- 1. predictions (recorded before the build) ---
+  B1: the subnet is private (defaultOutboundAccess false) and the VM has no public IP, so HTTPS to login.microsoftonline.com and www.microsoft.com fails from the VM (curl 000).
+  B2: the platform address 168.63.129.16 still answers (HTTP 200), so the VM agent and Run Command keep working.
+  B3: Trusted Launch (portal default) is kept; it will require the Enhanced backup policy in M2.
+--- 2. resource group, NSG, VNet with a private subnet ---
+  rg create exit=0
+  nsg create exit=0
+  vnet create exit=0
+  subnet private exit=0
+  snet-app defaultOutboundAccess: false
+  snet-app NSG: nsg-dr-app
+  NSG custom rules: 0 (expected 0: defaults only, no inbound from the internet)
+--- 3. VM as built (09:52:04) ---
+  security type: TrustedLaunch
+  size: Standard_B1s
+  image: ubuntu-24_04-lts:server
+  OS disk: Standard_LRS 30 GB
+  NIC public IP: '' (expected empty)
+  private IP: 10.81.1.4
+  power: VM running
+--- 4. Run Command: write test data, probe outbound ---
+  run-command exit=0
+    Enable succeeded: 
+    [stdout]
+    data written now
+    --- hashes
+    b9a1ede767c00b2a7d802cfc40820c9da92811c2377d9180110f727a587e8ffc  doc1.txt
+    74ebfbe6e577a97b35fc8285c89f30eeee380afff54557766050e453f2742a2b  doc2.txt
+    b9087fb31ba5b7dfb5579c9acd9488594c317cc0425726c7743490d24c6e4c9a  payload.bin
+    --- written at: 2026-11-07 14:52:24.987709465 +0000
+    --- outbound probes
+    https://login.microsoftonline.com -> 000 (curl exit 28)
+    https://www.microsoft.com -> 000 (curl exit 28)
+    wireserver 168.63.129.16 -> 200
+    --- run-command folders (RCA-001 replay check)
+    0
+    
+    [stderr]
+    
+--- 5. Run Command: read-only (so the last command on record is harmless; RCA-001) ---
+  run-command exit=0
+    Enable succeeded: 
+    [stdout]
+    b9a1ede767c00b2a7d802cfc40820c9da92811c2377d9180110f727a587e8ffc  doc1.txt
+    74ebfbe6e577a97b35fc8285c89f30eeee380afff54557766050e453f2742a2b  doc2.txt
+    b9087fb31ba5b7dfb5579c9acd9488594c317cc0425726c7743490d24c6e4c9a  payload.bin
+    0
+    1
+    
+    [stderr]
+    

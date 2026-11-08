@@ -1,0 +1,55 @@
+--- Lab 8 M2: Recovery Services vault and VM backup (2026-11-07 09:55:05) ---
+--- 1. predictions (recorded before the portal steps) ---
+  V1: the vault is created with LRS (set before anything is protected); Cross Region Restore off.
+  V2: for a Trusted Launch VM the protect wizard requires an Enhanced policy (Standard is not offered).
+  V3: after the VM is protected, changing storage redundancy is refused (portal greyed out; CLI error).
+  V4: the backup succeeds although the VM has no outbound internet (the platform takes the snapshot, not the VM network).
+  V5: the Take Snapshot task completes within minutes; Transfer data to vault takes longer; a snapshot-tier recovery point exists before the transfer ends.
+  V6: Azure Backup creates its own resource group (AzureBackupRG_eastus_1) for the instant restore snapshots.
+--- 2. vault as built (10:10:35) ---
+  storageType: ; storageModelType: ; crossRegionRestore: 
+  softDelete: ; enhancedSecurity: 
+  policy: V2 | 1 | Daily | 7 (type | instant restore days | frequency | daily retention days)
+  protected item: vm-dr01 | IRPending | Passed | pol-vm-enhanced
+--- 3. planned failure V3: change redundancy after protection (CLI) ---
+  set GeoRedundant exit=1
+    WARNING: --classic-alerts and --azure-monitor-alerts-for-job-failures parameters will be ignored if provided.
+    WARNING: Please use the "az backup vault update" command to perform this operation instead.
+    ERROR: (StorageModelModifyError) Storage Redundancy option is locked when the first machine is registered with the vault, and cannot be modified thereafter. 
+    Code: StorageModelModifyError
+    Message: Storage Redundancy option is locked when the first machine is registered with the vault, and cannot be modified thereafter. 
+  storageType after the attempt:  (expected LocallyRedundant)
+  UNEXPECTED: redundancy changed - stop and report before continuing.
+--- 3b. correction (10:18:31) ---
+  CORRECTION: the empty values in sections 2 and 3 and the "UNEXPECTED: redundancy changed" line came from my block, not from Azure. backup-properties show returns two objects with the values under .properties; the block read them one level too high. The CLI change was refused (StorageModelModifyError) and is re-checked below.
+  Portal (Properties > Backup Configuration > Update), verbatim: "This option cannot be changed after protecting items. Geo-redundant storage (GRS) provides a higher level of data durability than Locally redundant storage (LRS) and costs more."
+  storageType: LocallyRedundant; storageModelType: LocallyRedundant; crossRegionRestore: False
+  softDelete: AlwaysON; enhancedSecurity: AlwaysON
+  vault tags: 
+  V1 held: LocallyRedundant. V3 held: the change was refused by the portal (greyed, message above) and the API (StorageModelModifyError).
+--- 4. backup job (waits for Take Snapshot, up to 20 min) ---
+  job status: InProgress | 2026-11-07T15:06:51.644493+00:00 | 0:11:55.519022 (10:18:46)
+    task: Take Snapshot | Completed | 0:08:11.429527
+    task: Transfer data to vault | InProgress | 0:03:43.928571
+    task: Validate Backup | NotStarted | 0:00:00
+  protected item now: Protected | 
+--- 5. recovery points ---
+    2026-11-07T15:06:58.804317+00:00 | FileSystemConsistent | InstantRP
+--- 6. side effects ---
+  Azure Backup resource groups: AzureBackupRG_eastus_1
+--- 7. backup job to completion (started waiting 10:23:04; up to 90 min) ---
+  job: Completed | 2026-11-07T15:06:51.644493+00:00 | 0:27:18.048152 (10:34:11)
+    task: Take Snapshot | Completed | 0:08:11.429527
+    task: Transfer data to vault | Completed | 0:18:02.214388
+    task: Validate Backup | Completed | 0:00:30.556788
+    recovery point: 2026-11-07T15:06:58.804317+00:00 | FileSystemConsistent | InstantRP,HardenedRP
+  vault tags: costCenter, environment, lab, owner, project
+--- 8. M2 findings ---
+  V1 held: LocallyRedundant; Cross Region Restore False.
+  V2 not observed directly: the Enhanced policy was used as planned; whether the portal offered Standard was not recorded. Docs: Trusted Launch backup with the Standard policy is supported only from CLI/PowerShell/REST.
+  V3 held: portal "This option cannot be changed after protecting items"; API StorageModelModifyError.
+  V4 held: the backup succeeded although the VM has no outbound internet (curl 000 in lab8-01).
+  V5 held: Take Snapshot completed (8:11) and an InstantRP point existed while Transfer data to vault was still running.
+  V6 held: AzureBackupRG_eastus_1 created by Azure Backup.
+  F7 (new, plan was wrong): softDeleteFeatureState AlwaysON and enhancedSecurityState AlwaysON on a vault created today. Docs: soft delete is enforced (secure by default) for Recovery Services vaults and cannot be disabled. Deleted backup data stays soft-deleted 14 days at no charge, so the vault and rg-dr-lab cannot be deleted until about 2026-11-21.
+  F8 (cosmetic): keys(tags || {}) is invalid JMESPath ({} is not a literal); tags are read as JSON instead.

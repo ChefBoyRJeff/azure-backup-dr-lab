@@ -1,10 +1,12 @@
 # Azure Backup and Recovery Lab
 
-Backup **and proven restore** for two workloads: an Azure VM's OS disk (Azure Disk Backup, restored and swapped back in) and blob data (operational backup, point-in-time restore). Recovery objectives were defined before testing, data loss was simulated, every restore was verified by **SHA-256 checksum**, and recovery time was **measured**. Results, including two failures and their root causes, are reported as they happened.
+Backup **and proven restore** for two workloads: an Azure VM's OS disk (Azure Disk Backup, restored and swapped back in) and blob data (operational backup, point-in-time restore). **Lab 8** extends it to **Azure VM backup** in a Recovery Services vault and **Azure Site Recovery** replication to a second region, with a test failover ([Lab 8 section](#lab-8-azure-vm-backup-and-site-recovery)). Recovery objectives were defined before testing, data loss was simulated, every restore was verified by **SHA-256 checksum**, and recovery time was **measured**. Results, including two failures and their root causes, are reported as they happened.
 
 Built as a hands-on project while studying for **AZ-104: Microsoft Azure Administrator**. This is lab work in a personal subscription, not a production environment.
 
-> **Status:** Complete. Teardown is done except the empty Backup vault, which can't be deleted until its soft-deleted item is purged on **2026-11-15 21:45 UTC** (see [Teardown](#teardown)).
+> **Status:** Complete. Two vaults are waiting for soft delete to expire before they can be deleted:
+> - the Backup vault `bv-backup-lab`, purge **2026-11-15 21:45 UTC** (see [Teardown](#teardown));
+> - the Lab 8 Recovery Services vault `rsv-dr-backup` and one instant restore snapshot, purge about **2026-11-21 16:10 UTC** (see [Lab 8 teardown](#lab-8-teardown)).
 
 ## Results at a Glance
 
@@ -13,6 +15,8 @@ Built as a hands-on project while studying for **AZ-104: Microsoft Azure Adminis
 | Disk restore, attempt 1 | ❌ restored disk re-damaged on first boot | 10:38 | ≤ 30:00 | **FAIL**, see [RCA-001](docs/rca/rca-001-run-command-replay.md) |
 | Disk restore, attempt 2 | ✅ both hashes match | **10:23** | ≤ 30:00 | **PASS** |
 | Blob point-in-time restore | ✅ overwritten and deleted blobs restored, control blob unchanged | **26:27** | ≤ 15:00 | **FAIL**, see [RCA-002](docs/rca/rca-002-blob-rto-target.md) |
+| Lab 8: VM restore, Replace existing | ✅ 3 of 3 hashes match | **27:37** (includes one refused attempt) | ≤ 30:00 | **PASS** |
+| Lab 8: Site Recovery test failover | ✅ 3 of 3 hashes match in West US; RPO **not proven** | job 2:27 | — | **Partial**, see [RCA-004](docs/rca/rca-004-test-failover-stale-and-not-isolated.md) |
 
 **RPO (Recovery Point Objective):** disk backups run daily, so the worst case is just under 24 h. In the test, the on-demand recovery point was 5½ minutes before the incident. Blob operational backup is continuous: any second inside the 7-day window can be restored.
 
@@ -77,13 +81,17 @@ These are the roles Microsoft documents for each operation ("Use only the role d
 ├── infra/
 │   ├── budget.bicep                   # $5 monthly budget on the lab RGs (subscription scope)
 │   ├── budget.example.bicepparam      # copy to budget.local.bicepparam (gitignored) with your email
-│   └── vault.bicep                    # Backup vault + disk and blob policies
+│   ├── vault.bicep                    # Backup vault + disk and blob policies
+│   └── lab8/
+│       └── recovery-vault.bicep       # Lab 8: Recovery Services vault + Enhanced VM policy
 ├── docs/
-│   ├── plan.md                        # approved plan, milestones, cost, safety, outcomes
-│   ├── evidence/                      # sanitized command output for every milestone (m0-01 ... m5-02)
+│   ├── plan.md                        # approved plan, milestones, cost, safety, outcomes (incl. Lab 8)
+│   ├── evidence/                      # sanitized command output (m0-01 ... m5-02, lab8-00 ... lab8-07)
 │   ├── rca/
 │   │   ├── rca-001-run-command-replay.md
-│   │   └── rca-002-blob-rto-target.md
+│   │   ├── rca-002-blob-rto-target.md
+│   │   ├── rca-003-asr-registration-private-subnet.md
+│   │   └── rca-004-test-failover-stale-and-not-isolated.md
 │   └── interview-guide.md
 ├── bicepconfig.json                   # linter rules raised to errors
 └── .gitignore                         # excludes *.local.bicepparam, infra/export/, testdata/
@@ -154,7 +162,9 @@ Every milestone has sanitized evidence in [`docs/evidence/`](docs/evidence/):
 
 1. **[RCA-001](docs/rca/rca-001-run-command-replay.md): the restored disk came back already damaged.** The backup and restore were correct. Run Command (v1) replayed the destructive test script on the restored disk's first boot, because the disk's agent state was older than the VM's latest Run Command. Diagnosed from the disk's own boot history and agent folders, predicted for the retry, and observed three times.
 2. **[RCA-002](docs/rca/rca-002-blob-rto-target.md): blob RTO target missed.** The 15-minute target was set without checking documented service behavior. Microsoft documents that a PITR job can take up to an hour even for a few changes.
-3. **Smaller findings** (recorded in the evidence notes):
+3. **[RCA-003](docs/rca/rca-003-asr-registration-private-subnet.md): Site Recovery couldn't register the VM from a private subnet** (Lab 8). Backup worked from the same subnet, because the platform takes the snapshot. Site Recovery's agent runs in the guest and needs outbound HTTPS. I predicted the failure, then traced it from ARM error `151192` to the agent log (`registermachine`, error `20507`, 5-minute timeouts). A public IP fixed it, which confirmed the cause.
+4. **[RCA-004](docs/rca/rca-004-test-failover-stale-and-not-isolated.md): the test failover ran on old data and wasn't isolated** (Lab 8). Auto-shutdown paused replication overnight. The drill was started before replication caught up, and it used the default target VNet, which has internet access. The data matched, but the RPO wasn't proven.
+5. **Smaller findings** (recorded in the evidence notes):
    - The portal budget filter can't select empty resource groups; Bicep accepts their names.
    - What-if flagged date-only strings against stored ISO timestamps; declaring exactly what Azure stores fixed it.
    - The vault API rejected turning soft delete **Off** (`DppAlwaysOnSoftDeleteStateMandatory`): the current API version only accepts Always-On.
@@ -212,3 +222,135 @@ The disk instance was soft-deleted for 14 days. The blob instance wasn't, becaus
 - **Implement and manage storage:** blob versioning, change feed, soft delete, point-in-time restore, storage security settings
 - **Deploy and manage compute:** managed disks, snapshots, OS disk swap, Run Command
 - **Infrastructure as code:** Bicep with linting, what-if drift checks, exporting and codifying existing resources
+- **Lab 8, business continuity:**
+  - Recovery Services vault and Enhanced VM backup policy (Trusted Launch)
+  - instant restore, Replace existing restore
+  - secure-by-default soft delete
+  - Azure Site Recovery replication and test failover
+  - in-guest versus platform network dependencies
+
+## Lab 8: Azure VM Backup and Site Recovery
+
+Added 2026-11-07 to 2026-11-08 to cover the two services the original design declined on cost:
+- **Azure VM backup** in a Recovery Services vault;
+- **Azure Site Recovery** (ASR) replication to a second region.
+
+It was kept cheap:
+- one B1s VM with a Standard HDD disk;
+- backup protection stopped the same day;
+- replication torn down right after the drill.
+
+Every test had predictions recorded first ([lab8-01](docs/evidence/lab8-01-build.txt) to [lab8-05](docs/evidence/lab8-05-test-failover.txt)).
+
+### Lab 8 results
+
+| Test | Result | Measured |
+|---|---|---|
+| VM backup, Enhanced policy, VM with **no outbound internet** | ✅ Completed | Job 27:18. Snapshot 8:11; the instant restore point existed before the vault transfer finished. |
+| Change vault redundancy after protecting the VM | ✅ Refused as predicted (`StorageModelModifyError`) | — |
+| Restore, Replace existing, attempt 1 | ❌ Refused: `UserErrorVmNotShutDown` (VM must be deallocated) | — |
+| Restore, Replace existing, attempt 2 | ✅ 3 of 3 hashes match the baseline | RTO **27:37** against 30:00 |
+| Enable replication from the private subnet | ❌ `151192` / agent `20507` ([RCA-003](docs/rca/rca-003-asr-registration-private-subnet.md)) | Failed after about 33 min |
+| Enable replication with outbound HTTPS | ✅ Protected, health Normal | About 35 min |
+| Test failover to West US | ✅ 3 of 3 hashes match; ⚠️ RPO not proven; ⚠️ not isolated ([RCA-004](docs/rca/rca-004-test-failover-stale-and-not-isolated.md)) | Job 2:27 |
+| Vault as code (Bicep what-if) | ✅ NoChange on vault and policy, after one fix | — |
+
+### Lab 8 architecture
+
+```mermaid
+flowchart LR
+  subgraph east["East US"]
+    subgraph rgdr["rg-dr-lab"]
+      vm["vm-dr01<br/>Ubuntu 24.04, B1s, Trusted Launch<br/>private subnet, NSG default rules"] --- disk[("OS disk<br/>30 GB Standard HDD")]
+      rsv["Recovery Services vault rsv-dr-backup<br/>LRS, Enhanced policy pol-vm-enhanced"]
+    end
+    subgraph rgbk["AzureBackupRG_eastus_1 (created by Azure Backup)"]
+      rpc[("Restore point collection<br/>instant restore snapshots")]
+    end
+    cache[("Site Recovery cache<br/>storage account")]
+  end
+  subgraph west["West US"]
+    asrv["Site Recovery vault<br/>Site-recovery-vault-westus"]
+    replica[("Replica disk")]
+    test["vm-dr01-test<br/>test failover VM in vnet-dr-asr"]
+  end
+  rsv -. "backup: platform snapshot,<br/>no VM network needed" .-> rpc
+  rpc -. "Replace existing restore" .-> disk
+  vm -- "Mobility agent: outbound HTTPS<br/>(needed a public IP, RCA-003)" --> cache
+  cache -. "replication" .-> replica
+  asrv --- replica
+  replica -. "test failover (RCA-004)" .-> test
+```
+
+### Lab 8 design decisions
+
+| Decision | Alternative | Why |
+|---|---|---|
+| Recovery Services vault, **LRS**, cross-region restore off | GRS with cross-region restore | Cheapest. Redundancy locks after the first protected item, and the lab proved it (portal greyed out, `StorageModelModifyError`). |
+| **Enhanced policy** (V2): daily at 22:00 Eastern, 7-day retention, 1-day instant restore | Standard policy | The VM uses Trusted Launch (portal default), which the portal protects only with the Enhanced policy. Minimum retention keeps storage low. |
+| **Private subnet** (`defaultOutboundAccess: false`), no public IP | Default outbound access | Shows which services need the VM's network. Backup didn't; Site Recovery did. |
+| Standard **public IP** for Site Recovery outbound; NSG kept at default rules (inbound denied) | NAT gateway | The lab's cost policy blocks NAT gateways, and a public IP is $0.005/h. Lab pattern only; production would use NAT gateway, a firewall, or service-tag NSG rules. |
+| Backup protection **stopped the same day** | Keep protecting | The VM protected-instance fee is $10/month and billed pro rata. Soft-deleted data has no charge. |
+| ASR default policy and vault resource group | Custom policy and resource group | The VM blade only offered the defaults. Recorded as a deviation; replication was disabled after the drill. |
+| Built in the portal, then **codified** in [`infra/lab8/recovery-vault.bicep`](infra/lab8/recovery-vault.bicep) from exported state | Bicep first | What-if first showed two `Delete` lines on the policy. Azure stores `duration: 0` and `durationType: Invalid` for "no archive tier", and the template hadn't declared them. After declaring them: **NoChange=2** ([lab8-07](docs/evidence/lab8-07-bicep-whatif.txt)). |
+
+### Lab 8 evidence
+
+| File | What it proves |
+|---|---|
+| [lab8-00](docs/evidence/lab8-00-preflight.txt) | Providers, inventory, quotas, policy (NAT gateway blocked), retail prices |
+| [lab8-01](docs/evidence/lab8-01-build.txt) | Private subnet, no outbound (`curl 000`), baseline SHA-256 hashes |
+| [lab8-02](docs/evidence/lab8-02-backup.txt) | Vault settings, refused redundancy change, backup job timings, AlwaysON soft delete |
+| [lab8-03](docs/evidence/lab8-03-restore.txt) | Incident, refused and successful restore, hash match, RTO, Run Command replay |
+| [lab8-04](docs/evidence/lab8-04-asr.txt) | Replication failure diagnosis (ARM, ASR jobs, agent logs), fix, retry |
+| [lab8-05](docs/evidence/lab8-05-test-failover.txt) | Health diagnosis, test failover, data check, process deviation |
+| [lab8-06](docs/evidence/lab8-06-teardown.txt) | Teardown, corrections, blocked snapshot deletion |
+| [lab8-07](docs/evidence/lab8-07-bicep-whatif.txt) | Bicep lint, what-if drift check, fix, clean re-run |
+
+### Lab 8 findings
+
+- **Replace existing doesn't manage VM power.** The VM must be deallocated before the restore is accepted, and the job leaves it deallocated. Both steps belong in the runbook and in the RTO.
+- **Run Command replay (RCA-001) was reproduced on purpose.** The restored disk re-ran the latest Run Command at first boot. Because the read-only command had been issued last, the replay was harmless.
+- **Replace existing keeps the original OS disk** as an Unattached disk. It keeps billing until you delete it.
+- **Soft delete is AlwaysON on a new Recovery Services vault** (secure by default). The vault can't be deleted until the soft-deleted item is purged, 14 days after protection stops.
+- **The instant restore snapshot outlived its 1-day retention.** Deleting its resource group failed with `ResourceDeletionFailed`, with no further detail. Microsoft documents that recovery points of a soft-deleted item aren't cleaned up on expiry, so the soft-delete hold is the likely cause. That is **inferred**, not confirmed by the error.
+- **Disable replication left the Site Recovery extensions on the VM**; my prediction K3 was wrong. ASR also left a disk `ms-asr-<id>` in the source resource group; its purpose is unconfirmed, and it was deleted.
+- **The target VNet created by ASR didn't copy the private-subnet setting**: default outbound access was on.
+- **Windows `az` is a `.cmd` file.** An `&` in an `az rest` URL ends the command, so pass query parameters with `--uri-parameters` instead.
+
+### Lab 8 cost
+
+| Item | Basis (Azure Retail Prices API, East US / West US) | Estimate |
+|---|---|---|
+| VM backup protected instance | $10/month, protection stopped after about a day | ~$0.35 |
+| Vault storage (LRS) | $0.0224/GB-month, a few GB for a day | < $0.01 |
+| VM runtime | B1s $0.0104/h, about 10 h (auto-shutdown at 19:00) | ~$0.10 |
+| Test failover VM | B1s West US $0.0124/h, under 30 min | < $0.01 |
+| Public IP | $0.005/h, about 26 h | ~$0.13 |
+| Disks, replica disk, cache account | 30 GB Standard HDD, about a day each | ~$0.15 |
+| Site Recovery | $25/month per VM, but the first 31 days per instance are free | $0 |
+| Instant restore snapshot | Incremental, held until the purge date | Cents |
+| **Total** | | **Estimate under $1. Actual to be confirmed in Cost Management.** |
+
+### Lab 8 teardown
+
+Done 2026-11-08 ([lab8-06](docs/evidence/lab8-06-teardown.txt)):
+1. Cleaned up the test failover and disabled replication.
+2. Deleted both Site Recovery resource groups.
+3. Deleted the VM, its disks (including `ms-asr-<id>`), public IP, VNet, NSG and SSH key resource.
+4. Removed the downloaded private key from the PC.
+
+Still to do, **after 2026-11-21 16:10 UTC**, when the soft-deleted backup item is purged:
+1. Confirm the item is gone.
+2. Check the restore point collection in `AzureBackupRG_eastus_1`. Delete it if Azure Backup hasn't, then delete that resource group.
+3. Delete `rsv-dr-backup` and `rg-dr-lab`.
+
+**Lesson:** deleting a resource group doesn't override a hold on what's inside it. ARM tries to delete each resource and rolls the group back if one fails.
+
+### Lab 8 limitations
+
+- **The drill didn't prove the RPO.** The marker test was skipped, and the recovery point was most likely about 19 hours old ([RCA-004](docs/rca/rca-004-test-failover-stale-and-not-isolated.md)).
+- **No real failover or failback**, only a test failover. A planned or unplanned failover would also exercise re-protect and failback.
+- **The outbound path was a public IP on the VM.** That's acceptable in a lab with inbound denied, not as a production pattern.
+- **Crash-consistent only.** No app-consistent recovery points (warning `153006`); a single VM with no application.
+- **The vault is in Bicep, but the VM, network and replication aren't.** They were built in the portal for practice.

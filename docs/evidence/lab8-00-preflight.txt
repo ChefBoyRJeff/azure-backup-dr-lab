@@ -1,0 +1,64 @@
+--- Lab 8 M0: read-only preflight (2026-11-07 09:36:13) ---
+  repo HEAD: ff8c8db Interview guide: model answers for the follow-up challenges
+  az CLI: 2.90.0
+  subscription: AZ104_PracticeSubscription
+--- 1. resource providers ---
+  Microsoft.RecoveryServices   Registered
+  Microsoft.Compute            Registered
+  Microsoft.Network            Registered
+  Microsoft.Storage            Registered
+--- 2. inventory (expected: 0 RSV, only bv-backup-lab, no rg-dr*, no AzureBackupRG*) ---
+  Recovery Services vaults: 0 
+  Backup vaults (DataProtection): bv-backup-lab
+  matching resource groups: 0 
+  VMs: 0
+  disks: 0
+  public IPs: 0
+--- 3. VM size and image (Standard_B1s; restrictions empty = available) ---
+  eastus: restrictions = 'Zone	NotAvailableForSubscription'
+  eastus: standardBSFamily vCPU used/limit = 0 / 10
+  westus: restrictions = ''
+  westus: standardBSFamily vCPU used/limit = 0 / 10
+  Ubuntu 24.04 image (eastus, latest): Canonical:ubuntu-24_04-lts-daily:server-gen1:24.04.202611050
+--- 4. policy: "Block costly lab resources" (expect RecoveryServices and publicIPAddresses NOT blocked) ---
+  blocked types: 9
+  RecoveryServices blocked: False
+  publicIPAddresses blocked: False
+  natGateways blocked: True
+--- 5. address spaces in use (new VNet will be 10.81.0.0/16) ---
+  vnet-dev	eastus	10.40.0.0/16
+  vnet-prod	eastus	10.41.0.0/16
+  vnet-hub	eastus	10.0.0.0/16
+  vnet-spoke1	eastus	10.1.0.0/16
+  vnet-spoke2	eastus	10.2.0.0/16
+--- 6. prices (Azure Retail Prices API, consumption) ---
+  eastus | Backup | Azure Blob Protected Instance | 10 1/Month | tierMin 0
+  eastus | Backup | Archive LRS Data Stored | 0.0013 1 GB/Month | tierMin 0
+  eastus | Backup | PostgreSQL Protected Instance | 7.5 1/Month | tierMin 0
+  eastus | Backup | Cross region for ADLS and Blobs Protected Instance | 12 1/Month | tierMin 0
+  eastus | Backup | ADLS Gen2 Vaulted Protected Instance | 10 1/Month | tierMin 0
+  eastus | Backup | SAP HANA on Azure VM Protected Instance | 80 1/Month | tierMin 0
+  eastus | Backup | Azure Files Vaulted LRS Data Stored | 0.041 1 GB/Month | tierMin 0
+  eastus | Backup | Azure Files Protected Instance | 5 1/Month | tierMin 0
+  eastus | Backup | SQL Server in Azure VM Protected Instance | 25 1/Month | tierMin 0
+  eastus | Backup | On Premises Server Protected Instance | 10 1/Month | tierMin 0
+  eastus | Backup | Archive LRS Data Stored | 0.0013 1 GB/Month | tierMin 0
+  eastus | Backup | Cosmos DB Protected Instance | 25 1/Month | tierMin 0
+  eastus | Backup | Standard LRS Data Stored | 0.0224 1 GB/Month | tierMin 0
+  eastus | Backup | SAP ASE on Azure VM Protected Instance | 80 1/Month | tierMin 0
+  eastus | Backup | Azure Kubernetes Protected Instance | 12 1/Month | tierMin 0
+  eastus | Backup | Azure VM Protected Instance | 10 1/Month | tierMin 0
+  eastus | Backup | Azure Files Vaulted Protected Instance | 10 1/Month | tierMin 0
+  eastus | Backup | Azure Disks Vaulted Protected Instance | 10 1/Month | tierMin 0
+  westus | Azure Site Recovery | VM Replicated to Azure | 25 1/Month | tierMin 0
+  westus | Azure Site Recovery | VM Replicated to System Center | 16 1/Month | tierMin 0
+  westus | Virtual Machines BS Series | B1s | 0.0124 1 Hour | tierMin 0
+  eastus | Virtual Machines BS Series | B1s | 0.0104 1 Hour | tierMin 0
+  westus | Standard SSD Managed Disks | E4 LRS Disk | 2.4 1/Month | tierMin 0
+  eastus | IP Addresses | Standard IPv4 Static Public IP | 0.005 1 Hour | tierMin 0
+--- 7. budgets ---
+  budget-az104-lab	10.0	1.0912959431779863
+  budget-backup-dr-lab	5.0	0.1573434
+  budget-compute-hosting-lab	5.0	0.3839049979755818
+  budget-storage-pe-lab	5.0	0.3460551974020453
+--- result: read-only; nothing was created or changed ---

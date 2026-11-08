@@ -1,0 +1,125 @@
+--- Lab 8 M5: test failover (2026-11-08 14:02:04) ---
+--- 1. predictions (recorded before the drill) ---
+  T1: doc1, doc2 and payload.bin on the test VM match the baseline hashes in lab8-01.
+  T2: the RPO marker written seconds before the drill is ABSENT on the test VM when "Latest processed" is used.
+  T3: the source VM keeps running and replication stays Protected during the drill.
+  T4: the test VM re-runs the read-only Run Command (the last on record), harmlessly.
+  T5: the test VM has no outbound internet (isolated test VNet with a private subnet): curl 000.
+--- 2. resume replication ---
+  power: VM deallocated
+  start exit=0
+  replication: Protected | health=Critical | rpoInSeconds=67254 (14:35:56)
+  STOP: replication health is not Normal after 30 min - send this output before the drill.
+--- 2b. replication health diagnosis (14:37:21) ---
+  Symptom: after the VM was started (it had been deallocated by the 19:00 auto-shutdown), health stayed Critical for 30 min and rpoInSeconds stayed at 67254 (about 18.7 h, roughly the time since the shutdown).
+  Hypotheses (before reading): H1 the Mobility agent services did not come back after deallocate/start; H2 the agent runs but cannot reach ASR or the cache account; H3 the RPO value is stale and only refreshes after the next processed point.
+  item: Protected | health=Warning | allowed operations: DisableProtection, TestFailoverCleanup
+  rpoInSeconds=48 | lastRpoCalculatedTime=11/08/2026 19:35:28 | lastHeartbeat=11/08/2026 19:36:11
+  agent version=9.68.7950.1 | agent update required=False | monitoring= %
+  health error 153006 (Warning, 11/08/2026 17:57:25): No app-consistent recovery point available for the VM in the last 510 minutes.
+    causes: 
+      1. Replication is delayed due to network connectivity issues or low bandwidth availability.
+      2. If the source machine is Windows, Azure Site Recovery VSS provider is missing or a VSS writer is causing application consistent snapshot failures.
+      3. The data change rate (write bytes/sec) for one or more disks of the source machine has exceeded ASR supported limits. Refer https://aka.ms/asr-a2a-target-limits
+    
+    action: 
+      1. Ensure that the target storage type (Standard or Premium) is provisioned as per the churn rate requirement at source.
+      2. For troubleshooting refer https://aka.ms/a2a_app-consistency-failure.
+      3. If you do not need application consistency for this source machine, update the replication policy to have app consistency frequency of zero.
+      4. If the issue persists contact support.
+    
+--- 2c. on the VM (Run Command, read-only) ---
+    Enable succeeded: 
+    [stdout]
+    --- now / boot
+    2026-11-08T19:37:28Z
+    2026-11-08 19:02:30
+    --- outbound
+    https://login.microsoftonline.com -> 302
+    https://www.microsoft.com -> 200
+    --- ASR services
+      uarespawnd.service                                          loaded    active   running Configuration file for uarespawnd service
+      vxagent.service                                             loaded    active   exited  Configuration file for vxagent service
+    --- ASR processes
+    svagents           2075
+    s2                 1333
+    --- recent agent log errors
+    [/var/log/svagents_curr_88.log]
+    #~> (11-08-2026 19:33:01):   ERROR  1784 125709951424192 130 UpdateDiskEntities: Not reporting disk TempDisk to RCM as it is Azure VM Unsupported disk
+    --- run-command folders
+    6
+    7
+    8
+    
+    [stderr]
+    
+--- 2d. findings (14:41:18) ---
+  H1 rejected: uarespawnd.service active/running; svagents and s2 processes running.
+  H2 rejected: outbound 302/200 from the VM.
+  Replication caught up on its own: rpoInSeconds 48 at 19:35:28 UTC and a current heartbeat, about 33 min after boot (19:02:30 UTC). The 30-min guard was shorter than the catch-up; why it took that long is unconfirmed (H3 neither proven nor ruled out).
+  Health Warning 153006 "No app-consistent recovery point available for the VM in the last 510 minutes": the default 24-hour policy takes app-consistent snapshots and the VM was off overnight. Not blocking for a crash-consistent test failover. Docs action: set app-consistency frequency to zero if not needed.
+  Process deviation: a test failover was started in the portal although Step 1 had stopped before the test VNet and the RPO marker (portal status "Cleanup test failover pending"; allowed operations DisableProtection, TestFailoverCleanup). T2 as designed was not tested; this drill is recorded as it ran.
+--- 5. test failover job (the one that ran) ---
+  job: Succeeded | start 11/08/2026 19:25:56 | end 11/08/2026 19:28:23
+  custom details: null
+  recovery points available now: 14
+    oldest: 11/07/2026 17:26:30 | CrashConsistent
+    oldest: 11/07/2026 18:22:09 | CrashConsistent
+    oldest: 11/07/2026 19:18:00 | CrashConsistent
+    newest: 11/08/2026 19:39:44 | CrashConsistent
+    newest: 11/08/2026 19:34:40 | CrashConsistent
+    newest: 11/08/2026 19:29:37 | CrashConsistent
+--- 6. the test VM ---
+  test VM: vm-dr01-test (westus); size Standard_B1s; power: VM running
+  test NIC subnet: vnet-dr-asr/subnets/snet-app
+  test NIC public IP: ''
+    in rg-dr-lab-asr: Microsoft.Network/virtualNetworks | vnet-dr-asr
+    in rg-dr-lab-asr: Microsoft.Compute/disks | vmdr01-osdisk-20261107-154746-ASRReplica
+    in rg-dr-lab-asr: Microsoft.Compute/disks | vmdr01-osdisk-20261107-154746-ASRtest
+    in rg-dr-lab-asr: Microsoft.Network/networkInterfaces | vm-dr01349-test
+    in rg-dr-lab-asr: Microsoft.Compute/virtualMachines | vm-dr01-test
+--- 7. verify on the test VM (Run Command, read-only) ---
+  verify run-command exit=0
+    Enable succeeded: 
+    [stdout]
+    b9a1ede767c00b2a7d802cfc40820c9da92811c2377d9180110f727a587e8ffc  doc1.txt
+    74ebfbe6e577a97b35fc8285c89f30eeee380afff54557766050e453f2742a2b  doc2.txt
+    b9087fb31ba5b7dfb5579c9acd9488594c317cc0425726c7743490d24c6e4c9a  payload.bin
+    --- marker
+    marker ABSENT
+    --- boot
+    2026-11-08 19:28:09
+    --- newest file times on the disk
+    /var/lib/dr-lab/:
+    total 1036
+    -rw-r--r-- 1 root root      44 2026-11-07T14:52 doc1.txt
+    -rw-r--r-- 1 root root      44 2026-11-07T14:52 doc2.txt
+    -rw-r--r-- 1 root root      32 2026-11-07T14:52 nonce.txt
+    -rw-r--r-- 1 root root 1048576 2026-11-07T14:52 payload.bin
+    --- run-command folders
+    drwx------ 2 root root 4096 11-07T16:02 4
+    drwx------ 2 root root 4096 11-07T17:03 5
+    drwx------ 2 root root 4096 11-07T17:08 6
+    drwx------ 2 root root 4096 11-07T17:12 7
+    outbound www.microsoft.com -> 200
+    
+    [stderr]
+    
+--- 8. result ---
+  doc1.txt     match=True
+  doc2.txt     match=True
+  payload.bin  match=True
+  T1 data: 3 of 3 hashes match the baseline -> PASS
+--- 9. M5 findings ---
+  T1 held: 3 of 3 hashes match on vm-dr01-test (westus).
+  T2 not tested as designed (the marker was never written). Observed instead: the test VM disk has run-command folders up to #7 (2026-11-07 17:12 UTC) and lacks #8 (2026-11-08 19:37 UTC on the source), so the recovery point predates today. Given rpoInSeconds 67254 when the drill ran, it was most likely the last point before the 19:00 ET shutdown, about 19 h old (inference: the API returned customDetails null and did not name the point used).
+  T3 held: replication on the source was back to RPO 48 s at 19:35 UTC, after the drill (19:25:56-19:28:23 UTC).
+  T4 undetermined: the folder listing (tail -4) was cut; the test VM run-command sequence is not shown completely.
+  T5 WRONG: the test VM returned HTTP 200 to www.microsoft.com. The portal used vnet-dr-asr (the ASR-created target VNet), not an isolated test VNet; the test NIC has no public IP, so this is most likely default outbound access on the auto-created subnet (checked in Step B).
+  Drill timing: test failover job 2:27 (19:25:56 -> 19:28:23 UTC); test VM boot 19:28:09 UTC.
+  Lesson: check replication health and recovery point age before a drill or failover; a drill during Critical RPO restores old data. And choose an isolated test network explicitly; the default target VNet is not isolated from the internet.
+--- 10. teardown predictions (14:44:46, before the portal steps) ---
+  K1: Cleanup test failover deletes vm-dr01-test, its NIC and the ASRtest disk; vnet-dr-asr stays.
+  K2: Disable replication deletes the ASRReplica disk; the cache storage account stays (it lives in the vault resource group).
+  K3: Disable replication removes the Site Recovery extensions from vm-dr01.
+  K4: the ASR vault resource group deletes cleanly once nothing is replicated (hypothesis: vault infrastructure such as fabrics and policies may block it).

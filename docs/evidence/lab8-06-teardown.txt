@@ -1,0 +1,103 @@
+--- Lab 8 teardown (2026-11-08 14:47:00) ---
+--- 1. after cleanup and disable (K1-K3) ---
+    job: Remove the virtual machine from the vault | Succeeded
+    job: Test failover cleanup | Succeeded
+    job: Test failover | Succeeded
+    left in rg-dr-lab-asr: Microsoft.Network/virtualNetworks | vnet-dr-asr
+  vnet-dr-asr snet-app defaultOutboundAccess: '' (T5 check: empty or true = default outbound on)
+    extension still on vm-dr01: SiteRecovery-Linux | Succeeded
+    extension still on vm-dr01: SiteRecovery-LinuxUBUNTU2404 | Succeeded
+    in Site-recovery-vault-RG: Microsoft.RecoveryServices/vaults | Site-recovery-vault-westus
+    in Site-recovery-vault-RG: Microsoft.Storage/storageAccounts | b55xxksiterecovasrcache
+--- 2. delete the ASR resource groups ---
+  delete rg-dr-lab-asr exit=0
+  delete Site-recovery-vault-RG exit=0
+--- 3. delete the source VM and its network (the backup vault stays: soft-deleted item until about 2026-11-21) ---
+  delete VM exit=0
+  delete vmdr01-osdisk-20261107-154746 (Microsoft.Compute/disks) exit=0
+  delete ms-asr-<id> (Microsoft.Compute/disks) exit=0
+  delete pip-vm-dr01 (Microsoft.Network/publicIPAddresses) exit=0
+  delete vnet-dr (Microsoft.Network/virtualNetworks) exit=0
+  delete nsg-dr-app (Microsoft.Network/networkSecurityGroups) exit=0
+  delete vm-dr01_key (Microsoft.Compute/sshPublicKeys) exit=0
+    left in rg-dr-lab: Microsoft.RecoveryServices/vaults | rsv-dr-backup
+    left in AzureBackupRG_eastus_1: Microsoft.Compute/restorePointCollections | AzureBackup_vm-dr01_934655253595589255
+--- 4. subscription-wide check ---
+  VMs: 0
+  disks: 0
+  public IPs: 0
+  ASR cache storage accounts: 0
+    Recovery Services vault: rsv-dr-backup | rg-dr-lab | eastus
+  resource groups matching dr/asr/backup: rg-dr-lab, AzureBackupRG_eastus_1
+--- 5. local private key ---
+  Downloads\vm-dr01_key.pem not found (check where the browser saved it)
+--- 6. teardown findings ---
+  K1 held: Cleanup test failover removed vm-dr01-test, its NIC and the ASRtest disk; vnet-dr-asr stayed.
+  K2 held: Disable replication removed the ASRReplica disk; the cache account stayed until its resource group was deleted.
+  K3 WRONG: SiteRecovery-Linux and SiteRecovery-LinuxUBUNTU2404 were still on vm-dr01 (Succeeded) after Disable replication; they went with the VM.
+  K4 held: Site-recovery-vault-RG (vault + cache account) and rg-dr-lab-asr deleted with exit 0.
+  T5 confirmed: vnet-dr-asr/snet-app defaultOutboundAccess was unset (default outbound on); the ASR-created target VNet did not copy the private-subnet setting of the source.
+  Unexpected: a disk ms-asr-<id> existed in rg-dr-lab (created by ASR; purpose not confirmed); deleted.
+  Left: rsv-dr-backup (soft-deleted backup item, purge about 2026-11-21) and the restore point collection in AzureBackupRG_eastus_1.
+--- 7. restore point collection (cost check, 14:53:18) ---
+  restore points in the collection: 1
+     |  | 
+--- 8. export live vault configuration for the Bicep (gitignored infra/export/lab8) ---
+  backup-properties.json     1388 bytes
+  policies.json              5619 bytes
+  storageconfig.json          536 bytes
+  vault.json                 1437 bytes
+  vaultconfig.json            464 bytes
+  git sees the export folder (should be empty): ''
+--- 9. local private key search ---
+  removed vm-dr01_key.pem from Documents: True
+--- 7b. CORRECTION to section 7 ---
+  Section 7 is invalid. The & in the az rest URL ended the command inside az.cmd: the request went without api-version (MissingApiVersionParameter) and cmd tried to run "api-version" as a command.
+  "restore points in the collection: 1" and the empty line under it were an artifact: in PowerShell @($null).Count is 1.
+  Re-query: $expand passed with --uri-parameters (no & in the URL); nulls excluded from the count.
+  Prediction (before the query, low confidence): 0 restore points - stopping protection with delete data should remove the instant restore snapshots.
+  collection AzureBackup_vm-dr01_934655253595589255: 1 restore point(s) (re-queried 14:57:39)
+    AzureBackup_20261107_030655 | Succeeded | 11/07/2026 10:06:58
+--- 10. restore point collection cleanup (portal) ---
+  Found in 7b: 1 instant restore snapshot (AzureBackup_20261107_030655) still present after stop protection with delete data; the 7b prediction (0) was wrong.
+  The policy kept instant snapshots for 1 day; this one is about 29 hours old. Microsoft documents deleting the restore point collection manually.
+  The collection holds billed snapshot storage, not vault data; deleting it does not touch the soft-deleted backup item.
+  Prediction: the portal delete succeeds (protection stopped, no lock), the soft-deleted item is unaffected, and AzureBackupRG_eastus_1 is then empty.
+--- 10b. portal delete failed - diagnosis (2026-11-08 15:46:17) ---
+  Symptom (portal): "Failed to delete resource group AzureBackupRG_eastus_1" and "There was an error getting the status of the delete operation".
+  H1: the delete is still running or finished, and only the portal status poll failed.
+  H2: Azure refused to delete the restore point or its collection (for example a soft-delete hold or an outstanding disk access SAS); the error code will be in the activity log.
+  group exists: true
+  group provisioningState: Succeeded
+  resources left in the group: 1
+    Microsoft.Compute/restorePointCollections | AzureBackup_vm-dr01_934655253595589255 | Succeeded
+  locks on the group: 0
+  collection AzureBackup_vm-dr01_934655253595589255: provisioningState Failed, 1 restore point(s)
+    AzureBackup_20261107_030655 | Failed | 11/07/2026 10:06:58
+  activity log for the group, last 3 hours (oldest first; it can lag several minutes):
+    15:02:00 | Microsoft.Resources/subscriptions/resourceGroups/delete | Started  
+    15:02:01 | Microsoft.Resources/subscriptions/resourceGroups/delete | Accepted Accepted 
+    15:08:02 | Microsoft.Resources/subscriptions/resourcegroups/delete | Failed  ResourceGroupDeletionBlocked: Deletion of resource group 'AzureBackupRG_eastus_1' failed as resources with identifiers 'Microsoft.Compute/restorePointCollections/AzureBackup_vm-dr01_934655253595589255' could not be deleted. The provisioning state of the resource group will be rolled back. The tracking Id is '<id>'. Please check audit logs for more details. | detail ...
+    15:08:02 | Microsoft.Compute/restorePointCollections/delete | Failed  ResourceDeletionFailed: The request to delete the resource 'Microsoft.Compute/restorePointCollections/AzureBackup_vm-dr01_934655253595589255' failed. subscription id '<id>', activity id '<id>', request correlation id '<id>'.
+--- 10c. failed delete - full error, restore point status, soft-delete purge date (2026-11-08 15:47:37) ---
+  Jeff deleted the resource group directly (not the collection first). ARM deletes the contained resources first, so the collection delete failed and the group delete rolled back.
+  Hypothesis H3 (from docs, before reading the error): the soft-deleted backup item holds the instant snapshot - "When the item is in soft deleted state, no recovery points are cleaned on their expiry".
+  1) failed activity log events, full text:
+    15:08:02 | Microsoft.Resources/subscriptions/resourcegroups/delete
+      ResourceGroupDeletionBlocked: Deletion of resource group 'AzureBackupRG_eastus_1' failed as resources with identifiers 'Microsoft.Compute/restorePointCollections/AzureBackup_vm-dr01_934655253595589255' could not be deleted. The provisioning state of the resource group will be rolled back. The tracking Id is '<id>'. Please check audit logs for more details.
+      detail : {"Error":{"Code":"ResourceDeletionFailed","Target":null,"Message":"The request to delete the resource 'Microsoft.Compute/restorePointCollections/AzureBackup_vm-dr01_934655253595589255' failed. subscription id '<id>', activity id '<id>', request correlation id '<id>'.","Details":null,"AdditionalInfo":null}}
+    15:08:02 | Microsoft.Compute/restorePointCollections/delete
+      ResourceDeletionFailed: The request to delete the resource 'Microsoft.Compute/restorePointCollections/AzureBackup_vm-dr01_934655253595589255' failed. subscription id '<id>', activity id '<id>', request correlation id '<id>'.
+  2) restore point instance view:
+    provisioningState: Failed | consistencyMode: FileSystemConsistent
+  3) soft-deleted backup item in rsv-dr-backup:
+    vm-dr01 | protectionState ProtectionStopped | scheduledForDeferredDelete True | deferredDeleteTimeInUTC 11/07/2026 11:10:22 | deferredDeleteTimeRemaining 12.19:22:39.4479939
+--- 10d. conclusion (2026-11-08) ---
+  H1 rejected: the group delete failed and rolled back (activity log 15:08:02); the group and the collection still exist.
+  H2 confirmed in part: Azure refused to delete the restore point collection (ResourceDeletionFailed). The error gives no reason and the restore point instance view has no status messages.
+  No active-SAS error was returned, so revoking disk access does not apply.
+  H3 (soft-delete hold) is the best-supported explanation but NOT confirmed: docs say recovery points of a soft-deleted item are not cleaned on expiry; C2 (lab8-03) predicted the snapshots stay while the item is soft-deleted; the instant point outlived its 1-day retention.
+  Side effect: the failed delete left the collection and its restore point in provisioningState Failed.
+  Decision: no retry before the purge. Item vm-dr01 purges about 2026-11-21 16:10 UTC (12.19:22 remaining at 15:47 ET). Cost of waiting: one incremental snapshot of a 30 GB Standard HDD disk, cents.
+  After the purge: check whether Azure Backup removed the collection; if not, delete the collection first (portal, Show hidden types), then AzureBackupRG_eastus_1, then rsv-dr-backup and rg-dr-lab.
+  Lesson: deleting a resource group does not bypass a hold on a resource inside it; ARM deletes each resource and rolls the group back if one fails.

@@ -95,3 +95,32 @@ Recorded after execution (2026-11-01). The plan above is kept as approved; this 
 Monitoring of backup jobs (planned for M5) was not built; it's listed as an improvement in the README. Project 2 covers alerting.
 
 **Remaining actions after 2026-11-15 21:45 UTC:** delete policies `pol-disk-daily` and `pol-blob-operational`, vault `bv-backup-lab`, resource group `rg-backup-lab`; check the final cost; delete budget `budget-backup-dr-lab`.
+
+## Lab 8 Extension: VM Backup and Site Recovery (2026-11-07 to 2026-11-08)
+
+**Why it was added:** the original plan declined Azure VM backup and Azure Site Recovery on cost. Lab 8 covers both, for hands-on exposure before the AZ-104 exam, under the standing rule to keep lab costs as low as possible:
+- one B1s VM with a Standard HDD disk;
+- backup protection stopped the same day;
+- Site Recovery torn down after the drill (its first 31 days are free).
+
+**Objectives:**
+- RTO ≤ 30:00 for a Replace existing VM restore.
+- A test failover to West US with data verified by SHA-256.
+- An RPO check using a marker written just before the drill.
+
+| Milestone | Outcome | Deviation |
+|---|---|---|
+| M0 Preflight | Providers registered, quotas available, policy allows Recovery Services and public IPs (NAT gateway blocked), prices recorded | None |
+| M1 Build | Private subnet (`defaultOutboundAccess: false`), Trusted Launch B1s VM, baseline hashes; outbound blocked as predicted | Disk changed from Standard SSD to Standard HDD (cost) |
+| M2 VM backup | Vault LRS, Enhanced policy, backup Completed (27:18) with no VM outbound access; redundancy change refused | Soft delete was AlwaysON by default; the plan assumed it could be turned off |
+| M3 Restore | Replace existing: attempt 1 refused (VM running), attempt 2 PASS, RTO 27:37 | Deallocation added to the runbook |
+| M4 Site Recovery | Enable replication failed from the private subnet ([RCA-003](rca/rca-003-asr-registration-private-subnet.md)); Protected after a public IP was added | Default ASR policy and vault RG (the wizard offered no others) |
+| M5 Test failover | Data 3 of 3 PASS in West US; RPO not proven; test VM not isolated ([RCA-004](rca/rca-004-test-failover-stale-and-not-isolated.md)) | Drill started before the health gate passed; marker never written |
+| M6 Teardown and IaC | Everything deleted except the vault and one instant restore snapshot (soft-delete hold); vault codified in Bicep, what-if NoChange=2 | Resource group delete of `AzureBackupRG_eastus_1` failed (`ResourceDeletionFailed`) |
+| M7 Docs | README Lab 8 section, RCA-003, RCA-004, interview guide | — |
+
+**Remaining actions after 2026-11-21 16:10 UTC:**
+1. Confirm the soft-deleted item `vm-dr01` has been purged.
+2. Delete the restore point collection if it's still present, then `AzureBackupRG_eastus_1`.
+3. Delete `rsv-dr-backup` and `rg-dr-lab`.
+4. Check the actual Lab 8 cost in Cost Management.

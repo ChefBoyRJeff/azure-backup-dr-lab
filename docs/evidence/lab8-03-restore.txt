@@ -1,0 +1,115 @@
+--- Lab 8 M3: data loss and restore (2026-11-07 10:34:27) ---
+--- 1. predictions (recorded before the incident) ---
+  R1: Replace existing from the backup restores doc1, doc2 and payload.bin to the baseline hashes in lab8-01.
+  R2: Azure Backup snapshots the damaged disks first and leaves the original OS disk in rg-dr-lab after the swap.
+  R3 (hypothesis): the restore job manages VM power itself (stops the VM, swaps the disk, starts it again).
+  R4 (RCA-001): after the restore, the agent re-runs the latest command on record (the read-only one) once; the data is unaffected.
+  R5: RTO target 30:00 from detection to verified data. No documented restore duration exists for this path; the target comes from the P5 disk restore (10:23) plus margin.
+  OS disk before restore: vm-dr01_OsDisk_1_<suffix>
+--- 2. staging storage account (required by the restore wizard) ---
+  create stdrstagejj1107 exit=0
+--- 3. incident: delete doc1.txt, overwrite payload.bin with zeros (doc2 untouched) ---
+  incident run-command exit=0
+    Enable succeeded: 
+    [stdout]
+    --- after incident
+    total 1032
+    -rw-r--r-- 1 root root      44 Nov  7 14:52 doc2.txt
+    -rw-r--r-- 1 root root      32 Nov  7 14:52 nonce.txt
+    -rw-r--r-- 1 root root 1048576 Nov  7 15:35 payload.bin
+    74ebfbe6e577a97b35fc8285c89f30eeee380afff54557766050e453f2742a2b  doc2.txt
+    30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  payload.bin
+    
+    [stderr]
+    
+  RTO clock start (UTC): 2026-11-07T15:35:23Z
+--- 4. read-only Run Command (last command on record before the restore; RCA-001) ---
+  read-only run-command exit=0
+    Enable succeeded: 
+    [stdout]
+    total 1032
+    -rw-r--r-- 1 root root      44 Nov  7 14:52 doc2.txt
+    -rw-r--r-- 1 root root      32 Nov  7 14:52 nonce.txt
+    -rw-r--r-- 1 root root 1048576 Nov  7 15:35 payload.bin
+    0
+    1
+    2
+    3
+    
+    [stderr]
+    
+--- 5. restore job (waiting from 10:38:15; up to 60 min) ---
+  STOP: no Restore job found after 5 min - check the portal notification.
+--- 4b. restore attempt 1 refused (10:45:48) ---
+  Portal error: IaasVM restore validation errors; UserErrorVmNotShutDown "VM needs to be in deallocated state for performing replace disks operation"; recommendation "Please shut down the VM, and retry".
+  R3 WRONG: for Replace existing the restore job does not manage VM power; the VM must be deallocated before the restore is accepted.
+  power before: VM running
+  deallocate exit=0; power: VM deallocated
+  retry ready at (UTC): 2026-11-07T15:46:25Z
+--- 5b. restore attempt 2 (waiting from 10:47:01; up to 60 min) ---
+  restore job: Completed | 2026-11-07T15:47:12.294164+00:00 | 0:13:09.486173
+    task: Transfer data from vault | Completed | 0:00:00
+    task: Update the virtual machine | Completed | 0:00:00
+--- 6. VM and disks after the restore ---
+  power after job: VM deallocated
+  started VM exit=0 (the job left it 'VM deallocated')
+  OS disk now: vmdr01-osdisk-20261107-154746
+    disk in rg: vm-dr01_OsDisk_1_<suffix> | Unattached | Standard_LRS
+    disk in rg: vmdr01-osdisk-20261107-154746 | Attached | Standard_LRS
+--- 7. verify data (Run Command, read-only) ---
+  verify run-command exit=0
+    Enable succeeded: 
+    [stdout]
+    b9a1ede767c00b2a7d802cfc40820c9da92811c2377d9180110f727a587e8ffc  doc1.txt
+    74ebfbe6e577a97b35fc8285c89f30eeee380afff54557766050e453f2742a2b  doc2.txt
+    b9087fb31ba5b7dfb5579c9acd9488594c317cc0425726c7743490d24c6e4c9a  payload.bin
+    --- boot
+    2026-11-07 16:01:21
+    --- run-command folders (R4 replay check)
+    total 16
+    drwx------ 2 root root 4096 14:52:24 0
+    drwx------ 2 root root 4096 14:52:51 1
+    drwx------ 2 root root 4096 16:01:42 3
+    drwx------ 2 root root 4096 16:02:35 4
+    
+    [stderr]
+    
+--- 8. result ---
+  doc1.txt     baseline b9a1ede767c0... now b9a1ede767c0... match=True
+  doc2.txt     baseline 74ebfbe6e577... now 74ebfbe6e577... match=True
+  payload.bin  baseline b9087fb31ba5... now b9087fb31ba5... match=True
+  data: 3 of 3 hashes match the baseline -> PASS
+  RTO (detection to verified, including the refused attempt): 00:27:37 against 00:30:00 -> PASS
+--- 9. M3 findings ---
+  Redaction: the original OS disk name suffix (32 hex) replaced with <suffix> above, before publishing.
+  R1 held: 3 of 3 hashes match the baseline after Replace existing.
+  R2 held: new OS disk vmdr01-osdisk-20261107-154746 attached; the original OS disk kept in rg-dr-lab as Unattached.
+  R3 WRONG: Replace existing requires the VM to be deallocated first (UserErrorVmNotShutDown), and the job left the VM deallocated; it had to be started afterwards.
+  R4 held: run-command folders after the restore were 0, 1, 3, 4. The restored disk knew only 0 and 1; at first boot (16:01:21) the agent re-ran #3, the read-only command (folder 3 at 16:01:42). The destructive #2 did not run. The read-only last command (RCA-001 safeguard) made the replay harmless.
+  R5 held: RTO 27:37 against 30:00, including the refused first attempt (restore job 13:09; tasks Transfer data from vault, Update the virtual machine).
+  Lesson: for Replace existing, deallocate before starting the restore and start the VM after it; both steps belong in the runbook and the RTO.
+--- 10. cleanup predictions (11:09:02, before the portal step) ---
+  C1: after Stop backup with Delete backup data, the item is soft-deleted, not removed, with a purge date about 14 days out; the protected-instance charge stops.
+  C2 (hypothesis): the instant restore snapshots in AzureBackupRG_eastus_1 stay while the item is soft-deleted.
+  C3: the VMSnapshotLinux extension stays on the VM after protection stops.
+--- 11. after Stop backup (11:12:14) ---
+  item protectionState: ProtectionStopped
+  deferred delete: true | null | 13.23:58:04.6726622
+    recent job: DeleteBackupData | Completed | 2026-11-07T16:10:22.808409+00:00
+    recent job: Restore | Completed | 2026-11-07T15:47:12.294164+00:00
+    recent job: Backup | Completed | 2026-11-07T15:06:51.644493+00:00
+--- 12. what Azure Backup left behind ---
+    AzureBackupRG_eastus_1: Microsoft.Compute/restorePointCollections | AzureBackup_vm-dr01_934655253595589255
+--- 13. delete the replaced OS disk and the staging account ---
+  unattached original OS disks: 1
+  delete vm-dr01_OsDisk_1_<suffix> exit=0
+  delete stdrstagejj1107 exit=0
+    disk left: vmdr01-osdisk-20261107-154746 | Attached
+  storage accounts left in rg-dr-lab: 0
+  power: VM running (kept running for M4)
+--- 14. cleanup findings ---
+  Portal: "Stopping backup and deleting backup data for vm-dr01 - Successfully triggered the operation. Please monitor progress in Backup Jobs page." (no purge date shown in the notification)
+  C1 held: ProtectionStopped, isScheduledForDeferredDelete true, 13.23:58 remaining (14-day soft delete; no charge while soft-deleted per docs).
+  C2 held: restore point collection AzureBackup_vm-dr01_<n> still in AzureBackupRG_eastus_1.
+  C3 WRONG: no VMSnapshotLinux extension was listed by az vm extension list after protection stopped, and none was listed in lab8-02 section 6 either. Cause not investigated.
+  Cleaned up: original OS disk deleted, staging account deleted; 1 disk left (attached).

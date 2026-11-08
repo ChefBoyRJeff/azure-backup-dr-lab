@@ -1,0 +1,43 @@
+=== Lab 8 M6: Recovery Services vault as code - what-if drift check (2026-11-08 14:57:39) ===
+--- 1. predictions (recorded before running) ---
+  W1: bicep lint and build exit 0 with no findings (bicepconfig makes the core rules errors).
+  W2: rsv-dr-backup shows NoChange, or Modify only on properties Azure fills in itself (noise, not drift).
+  W3: pol-vm-enhanced shows NoChange: schedule, time zone, retention and instant RP days were copied from the export.
+  W4: nothing shows Create or Delete; other resources in rg-dr-lab show Ignore, and the Azure-created policies are left alone (incremental mode).
+  W5: tags show no change: the five tags in the template match the export, including the policy-required ones.
+--- 2. lint and build ---
+  WARNING: A new Bicep release is available: v0.49.2. Upgrade now by running "az bicep upgrade".
+  lint exit: 0
+  build exit: 0
+--- 3. what-if against rg-dr-lab (incremental, nothing deployed) ---
+  what-if exit: 0
+  status: Succeeded
+  NoChange  Microsoft.RecoveryServices/vaults/rsv-dr-backup
+      NoEffect properties.redundancySettings | before: (none) | after: {"crossRegionRestore":"Disabled","standardTierStorageRedundancy":"LocallyRedundant"}
+  Modify    Microsoft.RecoveryServices/vaults/rsv-dr-backup/backupPolicies/pol-vm-enhanced
+      Delete properties.tieringPolicy.ArchivedRP.duration | before: 0 | after: (none)
+      Delete properties.tieringPolicy.ArchivedRP.durationType | before: Invalid | after: (none)
+  summary: Modify=1, NoChange=1
+--- 4. results vs predictions ---
+  W1 held: lint and build exit 0. The WARNING line is the az CLI notice that a newer Bicep release exists, not a lint finding.
+  W2 held: rsv-dr-backup NoChange. redundancySettings is NoEffect (ignored by the service on an existing vault; redundancy is locked) - noise, not drift.
+  W3 WRONG: pol-vm-enhanced showed Modify with two Delete lines: tieringPolicy.ArchivedRP.duration (0) and durationType (Invalid).
+     Azure stores these values for tieringMode DoNotTier; the template did not declare them. Schedule, time zone, retention and instant RP days all matched.
+     Fix: declared duration 0 and durationType Invalid in the template (4415 -> 4681 bytes), so the drift check can come back clean.
+  W4 held for Create/Delete (none). No Ignore lines appeared: the vault looks like the only resource left in rg-dr-lab (counted in section 5).
+  W5 held: no tag changes.
+--- 5. what-if re-run after the fix (15:00:05) ---
+  W6 (prediction): both resources NoChange, no Modify, no Delete lines.
+  lint exit: 0
+  what-if exit: 0
+  status: Succeeded
+  NoChange  Microsoft.RecoveryServices/vaults/rsv-dr-backup
+      NoEffect properties.redundancySettings | before: (none) | after: {"crossRegionRestore":"Disabled","standardTierStorageRedundancy":"LocallyRedundant"}
+  NoChange  Microsoft.RecoveryServices/vaults/rsv-dr-backup/backupPolicies/pol-vm-enhanced
+  summary: NoChange=2
+  resources in rg-dr-lab: D:\Development\azure-backup-dr-lab>  "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\\..\python.exe" -IBm azure.cli resource list -g rg-dr-lab --query length(@) -o tsv (rsv-dr-backup)
+--- 5b. CORRECTION to the section 5 resource count ---
+  The count line is invalid: --query 'length(@)' has parentheses and no spaces, so PowerShell passed it to az.cmd unquoted and cmd failed (-o was unexpected at this time).
+  The name list on the same line did run (its query had spaces, so it was quoted): rsv-dr-backup only.
+  Re-count, done in PowerShell: 1 resource(s) in rg-dr-lab (rsv-dr-backup)
+  W6 held: both resources NoChange; the template matches the live vault.

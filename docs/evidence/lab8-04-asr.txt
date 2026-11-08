@@ -1,0 +1,152 @@
+--- Lab 8 M4: Azure Site Recovery East US -> West US (2026-11-07 11:14:17) ---
+--- 1. predictions (recorded before enabling replication) ---
+  A1: enabling replication fails while vm-dr01 is in the private subnet with no public IP: the Mobility agent cannot reach Entra ID / the ASR service, and the job fails with a connectivity error code in the 151xxx range.
+  A2: the target-side resources (rg-dr-lab-asr, rsv-dr-asr, a West US VNet) and the East US cache storage account are created before the failure and remain afterwards.
+  A3: after a Standard public IP is attached to the NIC (an explicit outbound method; NAT gateway is blocked by policy), a retry succeeds.
+  A4: the backup in M2 and M3 worked on the same VM and network; the difference is who moves the data (platform snapshot vs agent in the guest).
+--- 2. state before enabling ---
+  NIC public IP: '' (expected empty)
+  snet-app defaultOutboundAccess: false
+  power: VM running
+--- 3. after enable replication (12:03:20) ---
+  Deviation: the VM Disaster recovery blade offered only the default (new) 24-hour-retention-policy and the (new) Site-recovery-vault-RG for a new vault; custom policy and vault resource group were not selectable. Default policy used; cost impact negligible because replication is disabled after about 2 h.
+  resource group rg-dr-lab-asr (westus):
+    Microsoft.Network/virtualNetworks | vnet-dr-asr | westus
+  resource group Site-recovery-vault-RG (westus):
+    Microsoft.RecoveryServices/vaults | Site-recovery-vault-westus | westus
+    Microsoft.Storage/storageAccounts | b55xxksiterecovasrcache | eastus
+    Recovery Services vault: rsv-dr-backup | rg-dr-lab | eastus
+    Recovery Services vault: Site-recovery-vault-westus | Site-recovery-vault-RG | westus
+    cache storage: b55xxksiterecovasrcache | site-recovery-vault-rg | eastus | Standard_LRS
+  automation accounts in subscription: 0 (expected 0 with Manually manage)
+--- 4. Site Recovery agent on the VM ---
+    extension: SiteRecovery-Linux | Microsoft.Azure.RecoveryServices.SiteRecovery.Linux | ProvisioningState/succeeded | Execution succeeded.
+    extension: SiteRecovery-LinuxUBUNTU2404 | Microsoft.Azure.RecoveryServices.SiteRecovery2.LinuxUBUNTU2404 | ProvisioningState/failed/-9999 | Installation and configuration failed.
+    extension (ARM): SiteRecovery-Linux | Succeeded | 1.0
+    extension (ARM): SiteRecovery-LinuxUBUNTU2404 | Failed | 1.0
+--- 5. outbound from the VM right now (unchanged network) ---
+    Enable succeeded: 
+    [stdout]
+    https://login.microsoftonline.com -> 000
+    https://www.microsoft.com -> 000
+    3
+    4
+    5
+    /usr/local/ASR
+    /usr/local/InMage
+    
+    [stderr]
+    
+--- 6. diagnosis (12:08:31) ---
+  Symptom: portal "Deployment to resource group Site-recovery-vault-RG failed ... At least one resource deployment operation failed"; extension SiteRecovery-LinuxUBUNTU2404 ProvisioningState/failed/-9999 "Installation and configuration failed".
+  Hypothesis (before reading the details): the agent installed (folders /usr/local/ASR and /usr/local/InMage exist) but could not register with the Site Recovery service because the VM has no outbound HTTPS (curl 000).
+--- 6a. ARM deployments in the vault resource group ---
+    deployment: <id> | Failed | 2026-11-07T16:34:49.249125+00:00
+    deployment: l3VDZfnBO2Usv8omZeKleAw9tAff2YJFnMcEk9CfwKQ | Failed | 2026-11-07T16:58:13.856446+00:00
+    deployment: westus-eastus-24-hour-retention-policy | Succeeded | 2026-11-07T16:34:43.682095+00:00
+    deployment: westus-eastus-vnet-dr-asr | Succeeded | 2026-11-07T16:29:57.254581+00:00
+    deployment: eastus-westus-24-hour-retention-policy | Succeeded | 2026-11-07T16:31:45.983664+00:00
+    deployment: eastus-westus-vnet-dr | Succeeded | 2026-11-07T16:29:18.100065+00:00
+    deployment: asr-a2a-default-westus-container | Succeeded | 2026-11-07T16:29:15.416682+00:00
+    deployment: asr-a2a-default-westus | Succeeded | 2026-11-07T16:28:41.678367+00:00
+    deployment: asr-a2a-default-eastus-container | Succeeded | 2026-11-07T16:27:42.287192+00:00
+    deployment: 24-hour-retention-policy | Succeeded | 2026-11-07T16:25:51.127235+00:00
+    deployment: asr-a2a-default-eastus | Succeeded | 2026-11-07T16:26:57.343833+00:00
+    deployment: Site-recovery-vault-westus | Succeeded | 2026-11-07T16:25:18.041208+00:00
+    deployment: b55xxksiterecovasrcache | Succeeded | 2026-11-07T16:25:40.840947+00:00
+    deployment: Microsoft.RecoveryServices.IaaSDR-2026107112456 | Failed | 2026-11-07T16:58:17.106561+00:00
+    failed operation (Microsoft.RecoveryServices.IaaSDR-2026107112456): Microsoft.Resources/deployments | <id> | {"status":"Failed","error":{"code":"DeploymentFailed","message":"At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/arm-deployment-operations for usage details. Correlation ID: <id>","target":null,"details":[{"code":"NotFound","message":"{\r\n  \"error\": {\r\n    \"code\": \"ParentResourceNotFound\",\r\n    \"message\": \"Failed to perform 'write' on resource(s) of type 'automationAccounts/jobs', because the parent resource '/subscriptions/<id>/resourceGroups/site-recovery-vault-rg/providers/Microsoft.Automation/automationAccounts/site-reco-d7e-asr-automationaccount' could not be found.\"\r\n  }\r\n}","target":null,"details":null,"additionalInfo":null}],"additionalInfo":null}}
+    failed operation (Microsoft.RecoveryServices.IaaSDR-2026107112456): Microsoft.Resources/deployments | l3VDZfnBO2Usv8omZeKleAw9tAff2YJFnMcEk9CfwKQ | {"status":"Failed","error":{"code":"DeploymentFailed","message":"At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/arm-deployment-operations for usage details. Correlation ID: <id>","target":null,"details":[{"code":"Conflict","message":"{\r\n  \"status\": \"Failed\",\r\n  \"error\": {\r\n    \"code\": \"ResourceDeploymentFailure\",\r\n    \"message\": \"The resource write operation failed to complete successfully, because it reached terminal provisioning state 'Failed'.\",\r\n    \"details\": [\r\n      {\r\n        \"code\": \"151192\",\r\n        \"message\": \"Site recovery configuration failed.\"\r\n      }\r\n    ]\r\n  }\r\n}","target":null,"details":null,"additionalInfo":null}],"additionalInfo":null}}
+--- 6b. Site Recovery jobs (vault API) ---
+    job: Enable replication | Failed | vm-dr01
+    job: Associate replication policy | Succeeded | 24-hour-retention-policy
+    job: Map Networks | Succeeded | vnet-dr-asr
+    job: Associate replication policy | Succeeded | 24-hour-retention-policy
+    job: Create protection container | Succeeded | asr-a2a-default-westus-container
+    job: Map Networks | Succeeded | vnet-dr
+    job: Create protection container | Succeeded | asr-a2a-default-eastus-container
+    job: Create a site | Succeeded | asr-a2a-default-westus
+    job: Create replication policy | Succeeded | 24-hour-retention-policy
+    job: Create a site | Succeeded | asr-a2a-default-eastus
+--- 6c. agent logs on the VM (Run Command, read-only) ---
+    Enable succeeded: 
+    [stdout]
+    --- extension log dirs
+    Microsoft.Azure.RecoveryServices.SiteRecovery.Linux
+    Microsoft.Azure.RecoveryServices.SiteRecovery2.LinuxUBUNTU2404
+    --- /var/log/azure/Microsoft.Azure.RecoveryServices.SiteRecovery.Linux (last error lines)
+    2026-11-07 16:35:18.073861 [error] [system_details.py:get_os_info:55] Failed to fetch os information.
+    AttributeError: module 'platform' has no attribute 'linux_distribution'
+    2026-11-07 16:36:20.078328 [error] [system_details.py:get_os_info:55] Failed to fetch os information.
+    AttributeError: module 'platform' has no attribute 'linux_distribution'
+    2026-11-07 16:36:20.277781 [error] [handler.py:process_config:232] The status blob URI: https://b55xxksiterecovasrcache.blob.core.windows.net/asrextension<id>getosdetails/status?<redacted>
+    2026-11-07 16:37:32.571290 [error] [system_details.py:get_os_info:55] Failed to fetch os information.
+    AttributeError: module 'platform' has no attribute 'linux_distribution'
+    2026-11-07 17:03:49.694959 [error] [system_details.py:get_os_info:55] Failed to fetch os information.
+    AttributeError: module 'platform' has no attribute 'linux_distribution'
+    --- /var/log/azure/Microsoft.Azure.RecoveryServices.SiteRecovery2.LinuxUBUNTU2404 (last error lines)
+    A2aVmExtension.exceptions.ProcessFailedWithMultipleErrorCode
+    2026-11-07 16:57:03.712773 [information] [install_and_configure_base.py:execute:79] Installation and configuration failed.
+    2026-11-07 16:57:03.712905 [error] [install_and_configure_base.py:get_detailed_error_codes:506] Error file content : {"Errors":[{"error_name":"ConfiguratorConfigurationFailed",
+    "error_params":{"ErrorCode":"20507","VMName":"vm-dr01"},"default_message":"Configuration failed with internal error."
+    },{"error_name":"ConfiguratorConfigurationFailed",
+    "error_params":{"ErrorCode":"20507","VMName":"vm-dr01"},"default_message":"Configuration failed with internal error."
+    },{"error_name":"ConfiguratorConfigurationFailed",
+    "error_params":{"ErrorCode":"20507","VMName":"vm-dr01"},"default_message":"Configuration failed with internal error."
+    2026-11-07 16:57:03.713096 [information] [install_and_configure_base.py:execute:79] Execution error code {"unique_id": "<id>", "error_name": "ConfiguratorConfigurationFailed", "error_params": {"ErrorCode": "20507", "VMName": "vm-dr01"}, "default_message": null, "error
+    2026-11-07 16:57:03.733091 [information] [install_and_configure_base.py:upload_logs:427] Picking up log file: /var/log/InstallerErrors.json
+    2026-11-07 17:04:51.756344 [error] [system_details.py:get_os_info:55] Failed to fetch os information.
+    AttributeError: module 'platform' has no attribute 'linux_distribution'
+    --- /var/log/ua_install.log (last error lines)
+    11/07/2026 16:46:43: Executing the command : /usr/local/ASR/Vx/bin/AzureRcmCli --registermachine --errorfilepath /var/log/InstallerErrors.json
+    Error: request failed with return value 4, error code 20507.
+    Error: Configurator  Configuration  Failed
+    11/07/2026 16:51:48: registermachine operation has failed with exit code - 2
+    11/07/2026 16:51:53: Executing the command : /usr/local/ASR/Vx/bin/AzureRcmCli --registermachine --errorfilepath /var/log/InstallerErrors.json
+    Error: request failed with return value 4, error code 20507.
+    Error: Configurator  Configuration  Failed
+    11/07/2026 16:56:58: registermachine operation has failed with exit code - 2
+    11/07/2026 16:57:03 : Agent registration has failed. 
+    11/07/2026 16:57:03: Writing AGENT_CONFIGURATION_STATUS=Failed in /usr/local/.vx_version
+    
+    [stderr]
+    
+--- 7. findings and fix (12:12:27) ---
+  A1 held (pending A3 to confirm the cause): Enable replication failed. ARM: 151192 "Site recovery configuration failed". Agent (/var/log/ua_install.log): AzureRcmCli --registermachine "request failed with return value 4, error code 20507", about 5 min per try (timeout pattern), then "Agent registration has failed". The agent installed (/usr/local/ASR exists) but could not register; the VM has no outbound HTTPS.
+  A2 held: vnet-dr-asr (westus), Site-recovery-vault-westus (westus) and the cache account b55xxksiterecovasrcache (eastus) were created before the failure and remain.
+  Side finding 1 (not the cause, unconfirmed why): a nested deployment failed with ParentResourceNotFound writing automationAccounts/jobs to site-reco-d7e-asr-automationaccount, which was never created (automation accounts in subscription: 0).
+  Side finding 2 (noise): the bootstrap extension logged AttributeError platform.linux_distribution (removed in newer Python) on Ubuntu 24.04 but still reported succeeded.
+  Cosmetic: two deployment-operation queries hit a JMESPath join() on a null field; the failing operation was still captured.
+  Fix: explicit outbound with a Standard public IP on the NIC (NAT gateway blocked by policy). Inbound stays closed: nsg-dr-app has only default rules.
+  public IP create exit=0
+  attach to NIC exit=0
+  NIC public IP now: pip-vm-dr01 (address not logged)
+  NSG custom rules: 0 (0 = inbound from the internet denied by default)
+--- 8. outbound after the fix (Run Command) ---
+    Enable succeeded: 
+    [stdout]
+    https://login.microsoftonline.com -> 302
+    https://www.microsoft.com -> 200
+    
+    [stderr]
+    
+--- 9. retry (watching from 12:19:03; up to 75 min) ---
+  12:19:04  UnprotectedStatesBegin | Enabling protection | health=Normal |  %
+  12:23:09  InitialReplicationStartInProgress | Initial replication is in progress | health=Normal |  %
+  12:27:15  InitialReplicationInProgress | Initial replication is in progress | health=Normal |  %
+  12:34:23  InitialReplicationInProgress | Initial replication is in progress | health=Normal | InitialReplication 0%
+  12:40:31  InitialReplicationRecoveryCompletionPending | Waiting for first recovery point | health=Normal | InitialReplication 0%
+  12:54:48  Protected | Protected | health=Normal | InitialReplication 0%
+    job: Finalize protection on the recovery virtual machine | Succeeded | vm-dr01
+    job: Finalize protection on the primary virtual machine | Succeeded | vm-dr01
+    job: Enable replication | CompletedWithInformation | vm-dr01
+    job: Associate replication policy | Succeeded | 24-hour-retention-policy
+    extension: SiteRecovery-Linux | ProvisioningState/succeeded
+    extension: SiteRecovery-LinuxUBUNTU2404 | ProvisioningState/succeeded
+    rg-dr-lab-asr: Microsoft.Network/virtualNetworks | vnet-dr-asr | westus
+    rg-dr-lab-asr: Microsoft.Compute/disks | vmdr01-osdisk-20261107-154746-ASRReplica | westus
+--- 10. M4 findings ---
+  A3 held: after the public IP, outbound returned 302/200; the restarted Enable replication went enabling (12:19) -> initial replication (12:23) -> Protected, health Normal (12:54), about 35 min. Job CompletedWithInformation; SiteRecovery-LinuxUBUNTU2404 succeeded; replica disk created in rg-dr-lab-asr (westus).
+  This confirms A1: the same agent registered as soon as it had outbound HTTPS, so 151192 / 20507 was connectivity.
+  A4 held: backup (M2-M3) worked on the same VM and network without outbound access; ASR needed it because its agent in the guest sends the data.
+  Note: the VM was deallocated overnight by auto-shutdown (19:00); replication paused while it was off.
